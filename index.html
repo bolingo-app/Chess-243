@@ -49,6 +49,13 @@
           <div class="avatar you">♙</div><div class="player-info"><strong id="my-name">Vous</strong><small>Blancs</small></div>
           <div id="white-clock" class="clock active">05:00</div>
         </div>
+        <div class="board-actions">
+          <button id="new-game" class="btn btn-primary full">Nouvelle partie</button>
+        <div class="game-actions">
+          <button id="undo" class="btn btn-ghost">↶ Annuler</button>
+          <button id="resign" class="btn btn-ghost">Abandonner</button>
+        </div>
+        </div>
       </div>
 
       <aside class="game-panel">
@@ -84,7 +91,27 @@
           <input id="difficulty" type="range" min="1" max="19" value="10">
           <small id="difficulty-value">Niveau 10/19</small>
         </div>
-        <label for="theme">Thème de l’échiquier</label>
+        <button id="open-options" class="btn btn-ghost full" type="button">⚙ Options avancées</button>
+        <div class="status-box"><span class="status-label">ÉTAT DE LA PARTIE</span><strong id="game-status">À vous de jouer</strong><small id="turn-status">Trait aux Blancs</small></div>
+        <div class="moves-title"><strong>Coups joués</strong><button id="copy-pgn" class="text-button">Copier PGN</button></div>
+        <ol id="moves" class="moves"><li class="empty-moves">Les coups apparaîtront ici.</li></ol>
+        <p class="notice">Prototype : les parties sont locales à cet appareil. Le jeu en ligne, les classements officiels et les tournois seront ajoutés dans les prochaines étapes.</p>
+      </aside>
+    </section>
+
+    <section id="profile" class="bottom-grid">
+      <article class="info-card"><span class="card-icon">🏆</span><h3>Classements Elo</h3><p>Bullet, blitz et rapide auront chacun leur propre classement.</p><span class="tag">À venir</span></article>
+      <article class="info-card"><span class="card-icon">⚔️</span><h3>Défis en ligne</h3><p>Invite tes amis et joue des parties en temps réel.</p><span class="tag">À venir</span></article>
+      <article class="info-card"><span class="card-icon">♜</span><h3>Tournois & groupes</h3><p>Organise des compétitions publiques ou privées.</p><span class="tag">À venir</span></article>
+    </section>
+  </main>
+  <footer>CHESS243 <span>·</span> Première version de développement</footer>
+
+
+  <div id="options-sheet" class="sheet hidden" role="dialog" aria-modal="true" aria-labelledby="sheet-title">
+    <div class="sheet-card">
+      <div class="sheet-head"><h2 id="sheet-title">Options avancées</h2><button id="close-options" class="btn btn-small" type="button">Fermer</button></div>
+      <label for="theme">Thème de l’échiquier</label>
         <select id="theme">
           <option value="classic">01 · Gris classique</option>
           <option value="blueprint">02 · Bleu ardoise</option>
@@ -111,31 +138,13 @@
         <select id="move-sound"><option value="0">Bois léger</option><option value="1">Feutré</option><option value="2">Cristal</option><option value="3">Mécanique</option><option value="4">Classique</option><option value="5">Clair</option><option value="6">Doux</option><option value="7">Métallique</option><option value="8">Rapide</option><option value="9">Énergique</option></select>
         <label for="mate-sound">Son d’échec et mat (5 variantes)</label>
         <select id="mate-sound"><option value="0">Triomphe</option><option value="1">Solennel</option><option value="2">Royal</option><option value="3">Grave</option><option value="4">Épique</option></select>
-        <button id="new-game" class="btn btn-primary full">Nouvelle partie</button>
-        <div class="game-actions">
-          <button id="undo" class="btn btn-ghost">↶ Annuler</button>
-          <button id="resign" class="btn btn-ghost">Abandonner</button>
-        </div>
-        <div class="status-box"><span class="status-label">ÉTAT DE LA PARTIE</span><strong id="game-status">À vous de jouer</strong><small id="turn-status">Trait aux Blancs</small></div>
-        <div class="premove-panel">
+      <div class="premove-panel">
           <div class="premove-heading"><strong>Prémouvements · maximum 5 coups</strong><button id="clear-premoves" type="button" class="text-button">Effacer</button></div>
           <p id="premove-status">Pendant le tour de l’ordinateur, sélectionne une pièce blanche puis sa destination pour programmer un coup.</p>
           <small id="premove-list">Aucun prémouvement</small>
         </div>
-        <div class="moves-title"><strong>Coups joués</strong><button id="copy-pgn" class="text-button">Copier PGN</button></div>
-        <ol id="moves" class="moves"><li class="empty-moves">Les coups apparaîtront ici.</li></ol>
-        <p class="notice">Prototype : les parties sont locales à cet appareil. Le jeu en ligne, les classements officiels et les tournois seront ajoutés dans les prochaines étapes.</p>
-      </aside>
-    </section>
-
-    <section id="profile" class="bottom-grid">
-      <article class="info-card"><span class="card-icon">🏆</span><h3>Classements Elo</h3><p>Bullet, blitz et rapide auront chacun leur propre classement.</p><span class="tag">À venir</span></article>
-      <article class="info-card"><span class="card-icon">⚔️</span><h3>Défis en ligne</h3><p>Invite tes amis et joue des parties en temps réel.</p><span class="tag">À venir</span></article>
-      <article class="info-card"><span class="card-icon">♜</span><h3>Tournois & groupes</h3><p>Organise des compétitions publiques ou privées.</p><span class="tag">À venir</span></article>
-    </section>
-  </main>
-  <footer>CHESS243 <span>·</span> Première version de développement</footer>
-
+    </div>
+  </div>
   <script type="module" src="js/app.js"></script>
   <script src="js/pwa.js"></script>
 </body>
