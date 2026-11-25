@@ -103,3 +103,15 @@
   .square { font-size: min(10vw, 46px); }
   .promotion-chooser { inset: 13px; }
 }
+
+/* Personnalisation et outils de jeu */
+:root{--square-light:#e8dfc9;--square-dark:#78917f}
+.square.light{background:var(--square-light)}.square.dark{background:var(--square-dark)}
+.settings-block,.premove-box{margin-top:18px;padding:14px;border:1px solid var(--line);border-radius:11px;background:#101821}
+.settings-block h3,.analysis-results h3{margin:0 0 10px;font:600 14px 'Space Grotesk'}
+.engine-status{margin-top:10px;padding:9px 10px;border-radius:8px;background:#83a98a18;color:#a9c9ad;font-size:11px}
+.check-line{display:flex!important;align-items:center;gap:8px;margin:0!important;color:var(--text)!important}.check-line input{accent-color:var(--gold);width:17px;height:17px}
+.premove-box p{font-size:11px;color:var(--gold);line-height:1.5;overflow-wrap:anywhere}.premove-box small,.analysis-note{font-size:10px;color:var(--muted);line-height:1.5}
+.analysis-results{margin-top:14px;padding:13px;background:#101821;border:1px solid var(--line);border-radius:10px}.analysis-results p{font-size:11px;color:var(--muted);line-height:1.5}.analysis-table-wrap{overflow:auto;max-height:300px}
+.analysis-results table{width:100%;border-collapse:collapse;font-size:11px;white-space:nowrap}.analysis-results th,.analysis-results td{padding:8px 6px;border-bottom:1px solid var(--line);text-align:left}.analysis-results th{color:var(--gold)}
+.hidden{display:none!important}
