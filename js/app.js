@@ -4,8 +4,8 @@ const files = "abcdefgh";
 const symbols = {wk:"♔",wq:"♕",wr:"♖",wb:"♗",wn:"♘",wp:"♙",bk:"♚",bq:"♛",br:"♜",bb:"♝",bn:"♞",bp:"♟"};
 const $ = id => document.getElementById(id);
 
-let selected = null, legalTargets = [], lastMove = null, timer = null;
-let whiteSeconds = 300, blackSeconds = 300, running = false;
+let selected = null, legalTargets = [], lastMove = null, timer = null, engineMoveTimer = null;
+let whiteSeconds = 300, blackSeconds = 300, incrementSeconds = 0, running = false;
 let computer = true, pendingPromotion = null, audioContext = null;
 let engine = null, engineReady = false, engineThinking = false, engineBusy = false;
 let gameFinished = false, premoveFrom = null, premoves = [];
@@ -81,7 +81,7 @@ function onEngineMessage(event){
   if(line.includes("uciok")){
     const level=Number($("difficulty")?.value||10);
     engine.postMessage("setoption name Hash value 32");
-    engine.postMessage(`setoption name Skill Level value ${level}`);
+    applyEngineStrength(level);
     engine.postMessage("isready");
     return;
   }
@@ -102,13 +102,28 @@ function onEngineMessage(event){
     if(!gameFinished&&premoves.length)playNextPremove();
   }
 }
+function applyEngineStrength(level){
+  if(!engine)return;
+  const safeLevel=Math.max(1,Math.min(19,Number(level)||10));
+  // Le niveau Skill Level limite les choix du moteur ; UCI_Elo ajoute une
+  // limitation de force progressive lorsque cette option est disponible.
+  const elo=Math.round(1320+(safeLevel-1)*(1710/18));
+  engine.postMessage(`setoption name Skill Level value ${safeLevel}`);
+  engine.postMessage("setoption name UCI_LimitStrength value true");
+  engine.postMessage(`setoption name UCI_Elo value ${elo}`);
+}
 function requestComputerMove(){
   if(!computer||!engineReady||engineBusy||gameFinished||game.turn()!=="b")return;
   engineBusy=true;engineThinking=true;setEngineStatus("Stockfish réfléchit…","thinking");
-  const level=Number($("difficulty")?.value||10);
-  const depth=Math.max(4,Math.min(18,Math.round(4+level*.65)));
-  engine.postMessage(`position fen ${game.fen()}`);
-  engine.postMessage(`go depth ${depth}`);
+  clearTimeout(engineMoveTimer);
+  engineMoveTimer=setTimeout(()=>{
+    if(!computer||!engineReady||gameFinished||game.turn()!=="b") { engineBusy=false;engineThinking=false;return; }
+    const level=Number($("difficulty")?.value||10);
+    applyEngineStrength(level);
+    const depth=Math.max(6,Math.min(18,Math.round(7+level*.58)));
+    engine.postMessage(`position fen ${game.fen()}`);
+    engine.postMessage(`go depth ${depth}`);
+  },1500);
 }
 function difficultyName(level){
   if(level<=4)return "Débutant";
@@ -118,8 +133,8 @@ function difficultyName(level){
 }
 function setDifficulty(){
   const level=Number($("difficulty").value);
-  $("difficulty-value").textContent=`${difficultyName(level)} · Niveau ${level}/20`;
-  if(engineReady)engine.postMessage(`setoption name Skill Level value ${level}`);
+  $("difficulty-value").textContent=`${difficultyName(level)} · Niveau ${level}/19`;
+  if(engineReady)applyEngineStrength(level);
 }
 
 function drawBoard(){
@@ -129,7 +144,14 @@ function drawBoard(){
     el.type="button";el.className=`square ${(r+c)%2===0?"light":"dark"}`;
     if(selected===square)el.classList.add("selected");if(legalTargets.includes(square))el.classList.add("target");
     if(lastMove&&(lastMove.from===square||lastMove.to===square))el.classList.add("last");
-    if(piece)el.textContent=symbols[piece.color+piece.type];
+    if(piece){
+      const glyph=document.createElement("span");
+      glyph.className=`piece ${piece.color==="w"?"piece-white":"piece-black"}`;
+      glyph.textContent=symbols[piece.color+piece.type];
+      el.appendChild(glyph);
+    }
+    if(r===7){const coord=document.createElement("span");coord.className="coordinate file-coordinate";coord.textContent=files[c].toUpperCase();el.appendChild(coord);}
+    if(c===7){const coord=document.createElement("span");coord.className="coordinate rank-coordinate";coord.textContent=String(8-r);el.appendChild(coord);}
     el.setAttribute("aria-label",square+(piece?` ${piece.color==="w"?"blanc":"noir"} ${piece.type}`:""));
     el.addEventListener("click",()=>onSquare(square));boardEl.appendChild(el);
   }
@@ -172,23 +194,58 @@ function renderPremoves(){const el=$("premove-list");if(!el)return;el.textConten
 function showPromotionChooser(from,to,color){pendingPromotion={from,to};selected=from;const panel=document.querySelector(".board-panel");let chooser=$("promotion-chooser");if(!chooser){chooser=document.createElement("div");chooser.id="promotion-chooser";chooser.className="promotion-chooser";chooser.setAttribute("role","dialog");chooser.setAttribute("aria-modal","true");panel.appendChild(chooser);}const choices=[{type:"q",label:"Dame"},{type:"r",label:"Tour"},{type:"b",label:"Fou"},{type:"n",label:"Cavalier"}];chooser.innerHTML=`<div class="promotion-card"><strong>Promouvoir en…</strong><div class="promotion-options">${choices.map(c=>`<button type="button" class="promotion-choice" data-piece="${c.type}"><span>${symbols[color+c.type]}</span><small>${c.label}</small></button>`).join("")}</div></div>`;chooser.querySelectorAll("button").forEach(b=>b.addEventListener("click",()=>{const data=pendingPromotion;const promo=b.dataset.piece;closePromotionChooser();if(data)makeMove(data.from,data.to,promo);}));}
 function closePromotionChooser(){const el=$("promotion-chooser");if(el)el.remove();pendingPromotion=null;}
 function makeMove(from,to,promotion="q"){const move=game.move({from,to,promotion});if(!move){selected=null;legalTargets=[];drawBoard();return;}lastMove=move;selected=null;legalTargets=[];afterMove(true);}
-function afterMove(isHuman){drawBoard();if(game.in_checkmate()){finishGame();return;}if(game.game_over()){gameFinished=true;stopClock();setEngineStatus("Partie terminée","ready");return;}if(isHuman)playMoveSound();else playMoveSound();startClock();if(computer&&game.turn()==="b")requestComputerMove();}
+function afterMove(isHuman){
+  // L'incrément est ajouté au joueur qui vient de terminer son coup.
+  if(incrementSeconds>0){if(game.turn()==="b")whiteSeconds+=incrementSeconds;else blackSeconds+=incrementSeconds;}
+  drawBoard();if(game.in_checkmate()){finishGame();return;}if(game.game_over()){gameFinished=true;stopClock();setEngineStatus("Partie terminée","ready");return;}
+  playMoveSound();startClock();if(computer&&game.turn()==="b")requestComputerMove();
+}
 function finishGame(){gameFinished=true;stopClock();playCheckmateSound();$("game-status").textContent=`Échec et mat — ${game.turn()==="w"?"Noirs":"Blancs"} gagnent`;$("turn-status").textContent="Partie terminée";setEngineStatus("Partie terminée","ready");drawBoard();}
 function renderMoves(){const list=$("moves");list.innerHTML="";const h=game.history();if(!h.length){list.innerHTML='<li class="empty-moves">Les coups apparaîtront ici.</li>';return;}for(let i=0;i<h.length;i+=2){const li=document.createElement("li");li.textContent=`${Math.floor(i/2)+1}. ${h[i]}${h[i+1]?"   "+h[i+1]:""}`;list.appendChild(li);}}
 function renderStatus(){const over=game.game_over()||gameFinished;let status="À vous de jouer";const turn=game.turn()==="w"?"Trait aux Blancs":"Trait aux Noirs";if(game.in_checkmate())status=`Échec et mat — ${game.turn()==="w"?"Noirs":"Blancs"} gagnent`;else if(game.in_stalemate())status="Partie nulle — pat";else if(game.in_threefold_repetition()||game.insufficient_material()||game.in_draw())status="Partie nulle";else if(game.in_check())status="Échec !";$("game-status").textContent=status;$("turn-status").textContent=over?"Partie terminée":turn;$("white-clock").textContent=fmt(whiteSeconds);$("black-clock").textContent=fmt(blackSeconds);$("white-clock").classList.toggle("active",running&&game.turn()==="w");$("black-clock").classList.toggle("active",running&&game.turn()==="b");}
 function startClock(){if(timer||gameFinished)return;running=true;timer=setInterval(()=>{if(game.turn()==="w")whiteSeconds--;else blackSeconds--;if(whiteSeconds<=0||blackSeconds<=0){stopClock();gameFinished=true;$("game-status").textContent=`Temps écoulé — ${whiteSeconds<=0?"Noirs":"Blancs"} gagnent`;$("turn-status").textContent="Partie terminée";setEngineStatus("Partie terminée","ready");}renderStatus();},1000);}
 function stopClock(){clearInterval(timer);timer=null;running=false;renderStatus();}
-function stopEngineSearch(){if(engine&&engineBusy){engine.postMessage("stop");engineBusy=false;engineThinking=false;}}
-function newGame(){stopClock();stopEngineSearch();closePromotionChooser();game.reset();if(engineReady){engine.postMessage("ucinewgame");engine.postMessage("isready");}selected=null;legalTargets=[];lastMove=null;gameFinished=false;premoves=[];premoveFrom=null;const minutes=Number($("mode").value);whiteSeconds=minutes*60;blackSeconds=minutes*60;computer=$("opponent").value==="computer";$("opponent-label").textContent=computer?"Stockfish 19":"Deux joueurs";$("premove-status").textContent="Les prémouvements sont disponibles pendant la réflexion de l'ordinateur.";if(computer){if(engineReady)setEngineStatus("Stockfish 19 prêt","ready");else bootStockfish();}else setEngineStatus("Mode deux joueurs","ready");drawBoard();}
+function stopEngineSearch(){
+  clearTimeout(engineMoveTimer);engineMoveTimer=null;
+  if(engine&&engineBusy){try{engine.postMessage("stop");}catch(e){}}
+  engineBusy=false;engineThinking=false;
+}
+function newGame(shouldScroll=true){
+  stopClock();stopEngineSearch();closePromotionChooser();game.reset();
+  if(engineReady){engine.postMessage("ucinewgame");applyEngineStrength(Number($("difficulty").value));engine.postMessage("isready");}
+  selected=null;legalTargets=[];lastMove=null;gameFinished=false;premoves=[];premoveFrom=null;
+  const [minutes,increment]=String($("mode").value).split("|").map(Number);
+  whiteSeconds=minutes*60;blackSeconds=minutes*60;incrementSeconds=increment||0;
+  computer=$("opponent").value==="computer";
+  $("opponent-label").textContent=computer?"Stockfish 19":"Deux joueurs";
+  $("premove-status").textContent="Les prémouvements sont disponibles pendant la réflexion de l’ordinateur.";
+  if(computer){if(engineReady)setEngineStatus("Stockfish 19 prêt","ready");else bootStockfish();}
+  else setEngineStatus("Mode deux joueurs","ready");
+  drawBoard();
+  if(shouldScroll)document.querySelector(".board-panel").scrollIntoView({behavior:"smooth",block:"start"});
+}
 
-$("new-game").addEventListener("click",newGame);
+$("new-game").addEventListener("click",()=>newGame(true));
 $("undo").addEventListener("click",()=>{if(pendingPromotion)closePromotionChooser();stopEngineSearch();stopClock();if(game.history().length){game.undo();if(computer&&game.history().length)game.undo();}gameFinished=false;premoves=[];premoveFrom=null;lastMove=null;selected=null;legalTargets=[];drawBoard();});
-$("resign").addEventListener("click",()=>{if(!gameFinished&&!game.game_over()){gameFinished=true;stopClock();stopEngineSearch();$("game-status").textContent=`Abandon — ${game.turn()==="w"?"Noirs":"Blancs"} gagnent`;$ ("turn-status").textContent="Partie terminée";}});
+$("resign").addEventListener("click",()=>{if(!gameFinished&&!game.game_over()){gameFinished=true;stopClock();stopEngineSearch();$("game-status").textContent=`Abandon — ${game.turn()==="w"?"Noirs":"Blancs"} gagnent`;$("turn-status").textContent="Partie terminée";}});
 $("copy-pgn").addEventListener("click",async()=>{try{await navigator.clipboard.writeText(game.pgn());$("copy-pgn").textContent="Copié !";setTimeout(()=>$("copy-pgn").textContent="Copier PGN",1400);}catch(e){alert(game.pgn()||"Aucun coup à copier.");}});
 $("difficulty").addEventListener("input",setDifficulty);setDifficulty();
 $("opponent").addEventListener("change",()=>{if($("opponent").value==="computer")bootStockfish();});
 $("theme").addEventListener("change",e=>{document.documentElement.dataset.boardTheme=e.target.value;});
-newGame();
+let boardPhotoUrl=null;
+$("board-photo").addEventListener("change",e=>{
+  const file=e.target.files&&e.target.files[0];if(!file)return;
+  if(!file.type.startsWith("image/")){alert("Choisis un fichier image valide.");e.target.value="";return;}
+  if(boardPhotoUrl)URL.revokeObjectURL(boardPhotoUrl);
+  boardPhotoUrl=URL.createObjectURL(file);
+  boardEl.style.backgroundImage=`url("${boardPhotoUrl}")`;
+  boardEl.classList.add("has-photo");
+});
+$("clear-board-photo").addEventListener("click",()=>{
+  if(boardPhotoUrl)URL.revokeObjectURL(boardPhotoUrl);boardPhotoUrl=null;
+  boardEl.style.backgroundImage="";boardEl.classList.remove("has-photo");$("board-photo").value="";
+});
+newGame(false);
 
 // Authentification Firebase existante : elle reste facultative à cette étape.
 import("./firebase.js").then(({auth,googleProvider,signInWithPopup,signOut,onAuthStateChanged})=>{if(!auth)return;onAuthStateChanged(auth,user=>{$("auth-status").textContent=user?(user.displayName||user.email||"Joueur connecté"):"Invité";$("my-name").textContent=user?(user.displayName||"Joueur"):"Vous";$("login-google").classList.toggle("hidden",!!user);$("logout").classList.toggle("hidden",!user);});$("login-google").addEventListener("click",async()=>{try{await signInWithPopup(auth,googleProvider);}catch(e){alert("Connexion impossible : "+e.message);}});$("logout").addEventListener("click",()=>signOut(auth));}).catch(()=>{});
