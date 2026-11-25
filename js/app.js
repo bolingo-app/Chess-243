@@ -1,349 +1,87 @@
-const boardEl = document.getElementById("board");
+const boardEl = document.getElementById('board');
 const game = new Chess();
-const files = "abcdefgh";
-const symbols = {
-  wk:"♔", wq:"♕", wr:"♖", wb:"♗", wn:"♘", wp:"♙",
-  bk:"♚", bq:"♛", br:"♜", bb:"♝", bn:"♞", bp:"♟"
-};
-
-let selected = null;
-let legalTargets = [];
-let lastMove = null;
-let timer = null;
-let whiteSeconds = 300;
-let blackSeconds = 300;
-let running = false;
-let computer = true;
-let pendingPromotion = null;
-let audioContext = null;
-
+const files = 'abcdefgh';
+const symbols = {wk:'♔',wq:'♕',wr:'♖',wb:'♗',wn:'♘',wp:'♙',bk:'♚',bq:'♛',br:'♜',bb:'♝',bn:'♞',bp:'♟'};
 const $ = id => document.getElementById(id);
 
-function fmt(seconds) {
-  const value = Math.max(0, seconds);
-  return `${String(Math.floor(value / 60)).padStart(2, "0")}:${String(value % 60).padStart(2, "0")}`;
-}
+let selected=null, legalTargets=[], lastMove=null, timer=null, whiteSeconds=300, blackSeconds=300, running=false;
+let computer=true, pendingPromotion=null, audioContext=null, engine=null, engineReady=false, engineBusy=false;
+let humanColor='w', premoveQueue=[], positionFens=[game.fen()], analysisRows=[], executingPremove=false, analyzing=false;
+const MAX_PREMOVES=5;
 
-/* Sons synthétisés localement : aucun fichier audio externe nécessaire. */
-function getAudioContext() {
-  const AudioCtx = window.AudioContext || window.webkitAudioContext;
-  if (!AudioCtx) return null;
-  if (!audioContext) audioContext = new AudioCtx();
-  if (audioContext.state === "suspended") audioContext.resume();
-  return audioContext;
-}
+const themes = {
+  classic:['#e8dfc9','#78917f','#293541'],
+  lichess:['#f0d9b5','#b58863','#6d4c32'],
+  walnut:['#e4c9a1','#805536','#392719'],
+  oak:['#ead7b0','#a8794e','#62432d'],
+  mahogany:['#e7c6a0','#89533e','#432b24'],
+  pine:['#e7e4ce','#8b9b73','#45533d'],
+  tournament:['#f0ead6','#76966b','#344b35'],
+  blue:['#dce6f2','#7293b8','#344a63'],
+  midnight:['#cbd2df','#596a87','#202b40'],
+  purple:['#e4d8ed','#9a7caf','#4e3d60'],
+  rose:['#f2d9d9','#bd858d','#68464c'],
+  sand:['#f2e4c5','#c5a46d','#80643b'],
+  marble:['#e7e9e9','#929b9d','#485255'],
+  graphite:['#d8d8d8','#777d83','#30353a'],
+  mint:['#e0eee5','#85b5a0','#426c5b'],
+  coral:['#f4dfd0','#d58c72','#814e40'],
+};
+const themeNames={classic:'Classique',lichess:'Bois Lichess',walnut:'Noyer foncé',oak:'Chêne',mahogany:'Acajou',pine:'Pin',tournament:'Tournoi vert',blue:'Bleu',midnight:'Minuit',purple:'Violet',rose:'Rose',sand:'Sable',marble:'Marbre',graphite:'Graphite',mint:'Menthe',coral:'Corail'};
+const soundNames=['Classique','Bois léger','Bois profond','Plastique','Pierre','Métal','Verre','Électronique','Arcade','Doux'];
+const mateNames=['Classique','Triomphal','Solennel','Arcade'];
 
-function playTone(frequency, start, duration, type = "sine", volume = 0.075) {
-  const ctx = getAudioContext();
-  if (!ctx) return;
-  const oscillator = ctx.createOscillator();
-  const gain = ctx.createGain();
-  oscillator.type = type;
-  oscillator.frequency.setValueAtTime(frequency, ctx.currentTime + start);
-  gain.gain.setValueAtTime(0.0001, ctx.currentTime + start);
-  gain.gain.exponentialRampToValueAtTime(volume, ctx.currentTime + start + 0.012);
-  gain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + start + duration);
-  oscillator.connect(gain);
-  gain.connect(ctx.destination);
-  oscillator.start(ctx.currentTime + start);
-  oscillator.stop(ctx.currentTime + start + duration + 0.02);
-}
+function fmt(s){s=Math.max(0,s);return `${String(Math.floor(s/60)).padStart(2,'0')}:${String(s%60).padStart(2,'0')}`;}
+function getAudioContext(){const A=window.AudioContext||window.webkitAudioContext;if(!A)return null;if(!audioContext)audioContext=new A();if(audioContext.state==='suspended')audioContext.resume();return audioContext;}
+function tone(freq,delay,duration,type='sine',volume=.06){const c=getAudioContext();if(!c)return;const o=c.createOscillator(),g=c.createGain();o.type=type;o.frequency.setValueAtTime(freq,c.currentTime+delay);g.gain.setValueAtTime(.0001,c.currentTime+delay);g.gain.exponentialRampToValueAtTime(volume,c.currentTime+delay+.01);g.gain.exponentialRampToValueAtTime(.0001,c.currentTime+delay+duration);o.connect(g);g.connect(c.destination);o.start(c.currentTime+delay);o.stop(c.currentTime+delay+duration+.02);}
+function playMoveSound(){const s=Number($('move-sound')?.value||0);const patterns=[[520,760],[420,620],[300,460],[680,880],[230,340],[760,520],[900,1200],[440,880],[660,990],[500,540]];const p=patterns[s]||patterns[0];const types=['triangle','sine','triangle','square','sine','sawtooth','sine','square','sawtooth','sine'];tone(p[0],0,.09,types[s],.05);tone(p[1],.025,.07,types[s],.03);}
+function playMateSound(){const s=Number($('mate-sound')?.value||0);const sets=[[[880,0],[660,.19],[440,.42]],[[523,0],[659,.14],[784,.28],[1046,.44]],[[440,0],[392,.24],[330,.48],[262,.72]],[[660,0],[880,.12],[660,.24],[1100,.38]]];(sets[s]||sets[0]).forEach(([f,d])=>tone(f,d,.2,s===3?'square':'triangle',.075));}
+function applyTheme(){const key=$('board-theme')?.value||'classic';const t=themes[key]||themes.classic;document.documentElement.style.setProperty('--square-light',t[0]);document.documentElement.style.setProperty('--square-dark',t[1]);$('board').style.borderColor=t[2];localStorage.setItem('chess243-theme',key);}
+function drawBoard(){boardEl.innerHTML='';for(let r=0;r<8;r++)for(let c=0;c<8;c++){const sq=files[c]+(8-r),piece=game.get(sq),el=document.createElement('button');el.type='button';el.className=`square ${(r+c)%2===0?'light':'dark'}`;if(selected===sq)el.classList.add('selected');if(legalTargets.includes(sq))el.classList.add('target');if(lastMove&&(lastMove.from===sq||lastMove.to===sq))el.classList.add('last');if(piece)el.textContent=symbols[piece.color+piece.type];el.setAttribute('aria-label',sq+(piece?` ${piece.color==='w'?'blanc':'noir'} ${piece.type}`:''));el.addEventListener('click',()=>onSquare(sq));boardEl.appendChild(el);}renderMoves();renderStatus();renderPremoveQueue();}
+function onSquare(sq){if(pendingPromotion||game.game_over()||!canHumanMove())return;const p=game.get(sq);if(selected&&legalTargets.includes(sq)){const moving=game.get(selected);if(moving?.type==='p'&&(sq.endsWith('8')||sq.endsWith('1'))){showPromotionChooser(selected,sq,moving.color);return;}makeMove(selected,sq);return;}if(p&&p.color===game.turn()){selected=sq;legalTargets=game.moves({square:sq,verbose:true}).map(m=>m.to);}else{selected=null;legalTargets=[];}drawBoard();}
+function canHumanMove(){return !computer||game.turn()===humanColor;}
+function showPromotionChooser(from,to,color){pendingPromotion={from,to};selected=from;const panel=document.querySelector('.board-panel');let chooser=$('promotion-chooser');if(!chooser){chooser=document.createElement('div');chooser.id='promotion-chooser';chooser.className='promotion-chooser';panel.appendChild(chooser);}const choices=[['q','Dame'],['r','Tour'],['b','Fou'],['n','Cavalier']];chooser.innerHTML=`<div class="promotion-card"><strong>Promouvoir en…</strong><div class="promotion-options">${choices.map(([t,n])=>`<button class="promotion-choice" data-piece="${t}"><span>${symbols[color+t]}</span><small>${n}</small></button>`).join('')}</div></div>`;chooser.querySelectorAll('button').forEach(b=>b.addEventListener('click',()=>{const d=pendingPromotion;closePromotionChooser();if(d)makeMove(d.from,d.to,b.dataset.piece);}));}
+function closePromotionChooser(){ $('promotion-chooser')?.remove();pendingPromotion=null;}
+function makeMove(from,to,promotion='q'){const move=game.move({from,to,promotion});if(!move){selected=null;legalTargets=[];drawBoard();return;}afterMove(move);}
+function afterMove(move){lastMove=move;selected=null;legalTargets=[];positionFens.push(game.fen());if(move.color===humanColor&&!executingPremove)premoveQueue=[];startClock();drawBoard();if(game.in_checkmate()){stopClock();playMateSound();showGameOver();return;}playMoveSound();if(game.game_over()){stopClock();showGameOver();return;}if(computer&&game.turn()===humanColor&&premoveQueue.length){setTimeout(runNextPremove,90);}else if(computer&&game.turn()!==humanColor){setTimeout(computerMove,180);}}
 
-function playMoveSound() {
-  playTone(520, 0, 0.085, "triangle", 0.055);
-  playTone(760, 0.025, 0.07, "sine", 0.035);
-}
+// Stockfish 19 lite, single-threaded: compatible with GitHub Pages without COOP/COEP headers.
+function initEngine(){if(engine||!window.Worker)return;try{const url='https://cdn.jsdelivr.net/npm/stockfish@19.0.1/bin/stockfish-19-lite-single.js';const base='https://cdn.jsdelivr.net/npm/stockfish@19.0.1/bin/';const blob=new Blob([`self.Module={locateFile:(path)=>'${base}'+path};importScripts('${url}');`],{type:'text/javascript'});engine=new Worker(URL.createObjectURL(blob));engine.onmessage=e=>handleEngineLine(String(e.data));engine.onerror=()=>{engineReady=false;$('engine-status').textContent='Moteur indisponible — vérifiez la connexion';};engine.postMessage('uci');}catch(e){$('engine-status').textContent='Stockfish non disponible';}}
+function handleEngineLine(line){if(line==='uciok'){engine.postMessage('isready');return;}if(line==='readyok'){engineReady=true;$('engine-status').textContent='Stockfish prêt';return;}if(line.startsWith('bestmove')){engineBusy=false;const uci=line.split(/\s+/)[1];if(!analyzing&&uci&&uci!=='(none)'&&computer&&game.turn()!==humanColor&&!game.game_over()){const move=game.move({from:uci.slice(0,2),to:uci.slice(2,4),promotion:uci[4]||'q'});if(move)afterMove(move);}return;}if(line.startsWith('info ')&&line.includes(' score ')){const m=line.match(/score (cp|mate) (-?\d+)/);if(m&&$('analysis-live'))$('analysis-live').textContent=m[1]==='mate'?`Mat en ${m[2]}`:`Évaluation ${((Number(m[2])/100)*(game.turn()==='w'?1:-1)).toFixed(2)}`;}}
+function computerMove(){if(game.game_over()||game.turn()===humanColor||engineBusy)return;initEngine();if(!engineReady){$('engine-status').textContent='Chargement de Stockfish…';setTimeout(computerMove,500);return;}engineBusy=true;const level=Number($('engine-level')?.value||10);engine.postMessage(`setoption name Skill Level value ${level}`);engine.postMessage(`position fen ${game.fen()}`);engine.postMessage(`go depth ${Math.max(5,Math.round(5+level*.9))}`);}
+function renderMoves(){const list=$('moves');list.innerHTML='';const h=game.history();if(!h.length){list.innerHTML='<li class="empty-moves">Les coups apparaîtront ici.</li>';return;}for(let i=0;i<h.length;i+=2){const li=document.createElement('li');li.textContent=`${Math.floor(i/2)+1}. ${h[i]}${h[i+1]?'   '+h[i+1]:''}`;list.appendChild(li);}}
+function renderStatus(){const over=game.game_over();let status='À vous de jouer';const turn=game.turn()==='w'?'Trait aux Blancs':'Trait aux Noirs';if(game.in_checkmate())status=`Échec et mat — ${game.turn()==='w'?'Noirs':'Blancs'} gagnent`;else if(game.in_stalemate())status='Partie nulle — pat';else if(game.in_threefold_repetition()||game.insufficient_material()||game.in_draw())status='Partie nulle';else if(game.in_check())status='Échec !';$('game-status').textContent=status;$('turn-status').textContent=over?'Partie terminée':turn;$('white-clock').textContent=fmt(whiteSeconds);$('black-clock').textContent=fmt(blackSeconds);$('white-clock').classList.toggle('active',running&&game.turn()==='w');$('black-clock').classList.toggle('active',running&&game.turn()==='b');}
+function startClock(){if(timer)return;running=true;timer=setInterval(()=>{if(game.turn()==='w')whiteSeconds--;else blackSeconds--;renderStatus();if(whiteSeconds<=0||blackSeconds<=0){stopClock();$('game-status').textContent=`Temps écoulé — ${whiteSeconds<=0?'Noirs':'Blancs'} gagnent`;showGameOver();}},1000);}
+function stopClock(){clearInterval(timer);timer=null;running=false;renderStatus();}
+function showGameOver(){ $('analysis-btn').classList.remove('hidden');$('game-over-note').textContent='Partie terminée. Vous pouvez lancer une analyse Stockfish.'; }
+function newGame(){stopClock();closePromotionChooser();game.reset();selected=null;legalTargets=[];lastMove=null;positionFens=[game.fen()];premoveQueue=[];analysisRows=[];whiteSeconds=Number($('mode').value)*60;blackSeconds=whiteSeconds;computer=$('opponent').value==='computer';humanColor=$('play-as')?.value||'w';$('opponent-label').textContent=computer?'Stockfish':'Deux joueurs';$('analysis-btn').classList.add('hidden');$('analysis-results').classList.add('hidden');$('game-over-note').textContent='';$('engine-status').textContent='Moteur en attente';drawBoard();if(computer&&humanColor==='b')setTimeout(computerMove,400);}
+function renderPremoveQueue(){const el=$('premove-list');if(!el)return;el.textContent=premoveQueue.length?premoveQueue.map((p,i)=>`${i+1}. ${p.from}→${p.to}`).join(' · '):'Aucun prémove en attente';}
+function queuePremove(from,to){if(premoveQueue.length>=MAX_PREMOVES){$('premove-feedback').textContent='Maximum : 5 prémoves.';return;}premoveQueue.push({from,to});$('premove-feedback').textContent=`Prémove ${premoveQueue.length}/5 préparé.`;renderPremoveQueue();}
+function runNextPremove(){if(!premoveQueue.length||game.game_over()||game.turn()!==humanColor)return;const p=premoveQueue.shift();const legal=game.moves({verbose:true}).find(m=>m.from===p.from&&m.to===p.to);if(legal){executingPremove=true;const m=game.move({from:p.from,to:p.to,promotion:'q'});if(m)afterMove(m);executingPremove=false;}else{$('premove-feedback').textContent='Prémove devenu illégal : annulé.';premoveQueue=[];renderPremoveQueue();}}
+function enablePremoveSelection(){if(!computer||game.turn()===humanColor||!$('premove-enabled').checked)return false;return true;}
+// In premove mode, taps select an intended move while the engine is thinking. Execution is revalidated after its reply.
+const originalDrawBoard=drawBoard;
+function premoveTap(square){const piece=game.get(square);if(!selected){if(piece&&piece.color===humanColor){selected=square;legalTargets=files.split('').flatMap(f=>Array.from({length:8},(_,i)=>f+(i+1))).filter(s=>s!==square);drawBoard();}return;}if(square===selected){selected=null;legalTargets=[];drawBoard();return;}queuePremove(selected,square);selected=null;legalTargets=[];drawBoard();}
+const _onSquare=onSquare;
+// Route clicks to premove input only when it is the engine's turn and the option is enabled.
+boardEl.addEventListener('click',e=>{if(!enablePremoveSelection())return;const btn=e.target.closest('.square');if(btn){e.stopImmediatePropagation();premoveTap(btn.getAttribute('aria-label').slice(0,2));}},true);
 
-function playCheckmateSound() {
-  // Petite signature sonore descendante, différente du son de coup.
-  playTone(880, 0, 0.18, "sine", 0.085);
-  playTone(660, 0.19, 0.22, "sine", 0.085);
-  playTone(440, 0.42, 0.42, "triangle", 0.09);
-}
+async function analyzeGame(){analyzing=true;if(!game.history().length){analyzing=false;alert('Jouez au moins un coup avant de lancer l’analyse.');return;}initEngine();$('analysis-btn').disabled=true;$('analysis-btn').textContent='Analyse en cours…';$('analysis-results').classList.remove('hidden');$('analysis-summary').textContent='Stockfish analyse chaque position. Cela peut prendre un moment sur mobile.';const hist=game.history({verbose:true});const fens=[new Chess().fen()];const replay=new Chess();hist.forEach(m=>{replay.move({from:m.from,to:m.to,promotion:m.promotion});fens.push(replay.fen());});analysisRows=[];
+  const waitReady=()=>new Promise(resolve=>{if(engineReady)return resolve();const start=Date.now();const poll=setInterval(()=>{if(engineReady||Date.now()-start>25000){clearInterval(poll);resolve();}},200);});await waitReady();if(!engineReady){$('analysis-summary').textContent='Stockfish ne répond pas. Réessayez avec une connexion Internet.';$('analysis-btn').disabled=false;$('analysis-btn').textContent='Analyser la partie';analyzing=false;return;}
+  const evaluate=fen=>new Promise(resolve=>{let score=0,mate=null,bestMove='—';const side=fen.split(' ')[1]==='w'?1:-1;const listener=e=>{const line=String(e.data);if(line.startsWith('info ')&&line.includes(' score ')){const m=line.match(/score (cp|mate) (-?\d+)/);if(m){score=m[1]==='cp'?Number(m[2])/100*side:null;mate=m[1]==='mate'?Number(m[2])*side:null;}}if(line.startsWith('bestmove')){bestMove=line.split(/\s+/)[1]||'—';engine.removeEventListener('message',listener);resolve({score,mate,bestMove});}};engine.addEventListener('message',listener);engine.postMessage(`position fen ${fen}`);engine.postMessage('go depth 9');});
+  for(let i=0;i<fens.length;i++){const ev=await evaluate(fens[i]);analysisRows.push({ply:i,move:i?hist[i-1].san:'Départ',...ev});}
+  const rows=analysisRows.slice(1).map((r,i)=>{const prev=analysisRows[i];const currentWhite=r.score===null?(r.mate>0?99:-99):r.score;const previousWhite=prev.score===null?(prev.mate>0?99:-99):prev.score;const swing=Math.abs(currentWhite-previousWhite);let tag='Bon coup';if(swing>2.5)tag='Erreur';else if(swing>1.2)tag='Imprécision';return {...r,tag};});const mistakes=rows.filter(r=>r.tag==='Erreur').length, inaccuracies=rows.filter(r=>r.tag==='Imprécision').length;$('analysis-summary').textContent=`${rows.length} demi-coups analysés · ${mistakes} erreurs détectées · ${inaccuracies} imprécisions. Les évaluations sont indicatives et calculées à profondeur 9.`;$('analysis-table').innerHTML=rows.map(r=>`<tr><td>${Math.ceil(r.ply/2)}${r.ply%2?'.':'…'}</td><td>${r.move}</td><td>${r.score===null?`Mat ${r.mate}`:r.score.toFixed(2)}</td><td>${r.bestMove}</td><td>${r.tag}</td></tr>`).join('');$('analysis-btn').disabled=false;$('analysis-btn').textContent='Actualiser l’analyse';analyzing=false;}
 
-function drawBoard() {
-  boardEl.innerHTML = "";
-  for (let r = 0; r < 8; r++) {
-    for (let c = 0; c < 8; c++) {
-      const square = files[c] + (8 - r);
-      const piece = game.get(square);
-      const element = document.createElement("button");
-      element.type = "button";
-      element.className = `square ${(r + c) % 2 === 0 ? "light" : "dark"}`;
+$('new-game').addEventListener('click',newGame);
+$('undo').addEventListener('click',()=>{if(pendingPromotion)closePromotionChooser();stopClock();game.undo();if(computer&&game.history().length)game.undo();lastMove=null;selected=null;legalTargets=[];positionFens=[game.fen()];premoveQueue=[];$('analysis-btn').classList.add('hidden');drawBoard();});
+$('resign').addEventListener('click',()=>{if(!game.game_over()){stopClock();$('game-status').textContent=`Abandon — ${game.turn()==='w'?'Noirs':'Blancs'} gagnent`;showGameOver();}});
+$('copy-pgn').addEventListener('click',async()=>{try{await navigator.clipboard.writeText(game.pgn());$('copy-pgn').textContent='Copié !';setTimeout(()=>$('copy-pgn').textContent='Copier PGN',1400);}catch(e){alert(game.pgn()||'Aucun coup à copier.');}});
+$('analysis-btn').addEventListener('click',analyzeGame);
+$('clear-premoves').addEventListener('click',()=>{premoveQueue=[];selected=null;legalTargets=[];$('premove-feedback').textContent='Prémoves annulés.';drawBoard();});
+$('board-theme').addEventListener('change',applyTheme);
+$('move-sound').addEventListener('change',()=>{playMoveSound();localStorage.setItem('chess243-move-sound',$('move-sound').value);});
+$('mate-sound').addEventListener('change',()=>{playMateSound();localStorage.setItem('chess243-mate-sound',$('mate-sound').value);});
+$('engine-level').addEventListener('change',()=>localStorage.setItem('chess243-engine-level',$('engine-level').value));
+$('board-theme').value=localStorage.getItem('chess243-theme')||'classic';$('move-sound').value=localStorage.getItem('chess243-move-sound')||'0';$('mate-sound').value=localStorage.getItem('chess243-mate-sound')||'0';$('engine-level').value=localStorage.getItem('chess243-engine-level')||'10';applyTheme();newGame();
 
-      if (selected === square) element.classList.add("selected");
-      if (legalTargets.includes(square)) element.classList.add("target");
-      if (lastMove && (lastMove.from === square || lastMove.to === square)) {
-        element.classList.add("last");
-      }
-
-      if (piece) element.textContent = symbols[piece.color + piece.type];
-      element.setAttribute(
-        "aria-label",
-        square + (piece ? ` ${piece.color === "w" ? "blanc" : "noir"} ${piece.type}` : "")
-      );
-      element.addEventListener("click", () => onSquare(square));
-      boardEl.appendChild(element);
-    }
-  }
-  renderMoves();
-  renderStatus();
-}
-
-function onSquare(square) {
-  if (pendingPromotion || game.game_over()) return;
-  if ((!running && game.history().length > 0 && whiteSeconds === 0) ||
-      (!running && game.history().length > 0 && blackSeconds === 0)) return;
-
-  const piece = game.get(square);
-
-  if (selected && legalTargets.includes(square)) {
-    const movingPiece = game.get(selected);
-    if (movingPiece && movingPiece.type === "p" &&
-        (square.endsWith("8") || square.endsWith("1"))) {
-      showPromotionChooser(selected, square, movingPiece.color);
-      return;
-    }
-
-    makeMove(selected, square);
-    return;
-  }
-
-  if (piece && piece.color === game.turn()) {
-    selected = square;
-    legalTargets = game.moves({ square, verbose: true }).map(move => move.to);
-  } else {
-    selected = null;
-    legalTargets = [];
-  }
-  drawBoard();
-}
-
-function showPromotionChooser(from, to, color) {
-  pendingPromotion = { from, to };
-  selected = from;
-  const panel = document.querySelector(".board-panel");
-  let chooser = document.getElementById("promotion-chooser");
-
-  if (!chooser) {
-    chooser = document.createElement("div");
-    chooser.id = "promotion-chooser";
-    chooser.className = "promotion-chooser";
-    chooser.setAttribute("role", "dialog");
-    chooser.setAttribute("aria-modal", "true");
-    chooser.setAttribute("aria-label", "Choisir la pièce de promotion");
-    panel.appendChild(chooser);
-  }
-
-  const choices = [
-    { type: "q", label: "Dame" },
-    { type: "r", label: "Tour" },
-    { type: "b", label: "Fou" },
-    { type: "n", label: "Cavalier" }
-  ];
-
-  chooser.innerHTML = `
-    <div class="promotion-card">
-      <strong>Promouvoir en…</strong>
-      <div class="promotion-options">
-        ${choices.map(choice => `
-          <button type="button" class="promotion-choice" data-piece="${choice.type}"
-                  aria-label="${choice.label}">
-            <span>${symbols[color + choice.type]}</span>
-            <small>${choice.label}</small>
-          </button>
-        `).join("")}
-      </div>
-    </div>
-  `;
-
-  chooser.querySelectorAll(".promotion-choice").forEach(button => {
-    button.addEventListener("click", () => {
-      const promotion = button.dataset.piece;
-      const moveData = pendingPromotion;
-      closePromotionChooser();
-      if (moveData) makeMove(moveData.from, moveData.to, promotion);
-    });
-  });
-}
-
-function closePromotionChooser() {
-  const chooser = document.getElementById("promotion-chooser");
-  if (chooser) chooser.remove();
-  pendingPromotion = null;
-}
-
-function makeMove(from, to, promotion = "q") {
-  const move = game.move({ from, to, promotion });
-  if (!move) {
-    selected = null;
-    legalTargets = [];
-    drawBoard();
-    return;
-  }
-
-  lastMove = move;
-  selected = null;
-  legalTargets = [];
-  startClock();
-  drawBoard();
-
-  if (game.in_checkmate()) {
-    stopClock();
-    playCheckmateSound();
-  } else {
-    playMoveSound();
-    if (game.game_over()) stopClock();
-    else if (computer && game.turn() === "b") {
-      setTimeout(computerMove, 450);
-    }
-  }
-}
-
-function computerMove() {
-  if (game.game_over() || game.turn() !== "b" || pendingPromotion) return;
-  const moves = game.moves();
-  if (!moves.length) return;
-
-  const move = game.move(moves[Math.floor(Math.random() * moves.length)]);
-  lastMove = move;
-  drawBoard();
-
-  if (game.in_checkmate()) {
-    stopClock();
-    playCheckmateSound();
-  } else {
-    playMoveSound();
-    if (game.game_over()) stopClock();
-  }
-}
-
-function renderMoves() {
-  const list = $("moves");
-  list.innerHTML = "";
-  const history = game.history();
-
-  if (!history.length) {
-    list.innerHTML = '<li class="empty-moves">Les coups apparaîtront ici.</li>';
-    return;
-  }
-
-  for (let i = 0; i < history.length; i += 2) {
-    const item = document.createElement("li");
-    item.textContent = `${Math.floor(i / 2) + 1}. ${history[i]}${history[i + 1] ? "   " + history[i + 1] : ""}`;
-    list.appendChild(item);
-  }
-}
-
-function renderStatus() {
-  const over = game.game_over();
-  let status = "À vous de jouer";
-  const turn = game.turn() === "w" ? "Trait aux Blancs" : "Trait aux Noirs";
-
-  if (game.in_checkmate()) {
-    status = `Échec et mat — ${game.turn() === "w" ? "Noirs" : "Blancs"} gagnent`;
-  } else if (game.in_stalemate()) {
-    status = "Partie nulle — pat";
-  } else if (game.in_threefold_repetition() || game.insufficient_material() || game.in_draw()) {
-    status = "Partie nulle";
-  } else if (game.in_check()) {
-    status = "Échec !";
-  }
-
-  $("game-status").textContent = status;
-  $("turn-status").textContent = over ? "Partie terminée" : turn;
-  $("white-clock").textContent = fmt(whiteSeconds);
-  $("black-clock").textContent = fmt(blackSeconds);
-  $("white-clock").classList.toggle("active", running && game.turn() === "w");
-  $("black-clock").classList.toggle("active", running && game.turn() === "b");
-}
-
-function startClock() {
-  if (timer) return;
-  running = true;
-  timer = setInterval(() => {
-    if (game.turn() === "w") whiteSeconds--;
-    else blackSeconds--;
-
-    renderStatus();
-    if (whiteSeconds <= 0 || blackSeconds <= 0) {
-      stopClock();
-      $("game-status").textContent =
-        `Temps écoulé — ${whiteSeconds <= 0 ? "Noirs" : "Blancs"} gagnent`;
-    }
-  }, 1000);
-}
-
-function stopClock() {
-  clearInterval(timer);
-  timer = null;
-  running = false;
-  renderStatus();
-}
-
-function newGame() {
-  stopClock();
-  closePromotionChooser();
-  game.reset();
-  selected = null;
-  legalTargets = [];
-  lastMove = null;
-  const minutes = Number($("mode").value);
-  whiteSeconds = minutes * 60;
-  blackSeconds = minutes * 60;
-  computer = $("opponent").value === "computer";
-  $("opponent-label").textContent = computer ? "Ordinateur" : "Deux joueurs";
-  drawBoard();
-}
-
-$("new-game").addEventListener("click", newGame);
-$("undo").addEventListener("click", () => {
-  if (pendingPromotion) closePromotionChooser();
-  stopClock();
-  game.undo();
-  if (computer && game.history().length) game.undo();
-  lastMove = null;
-  selected = null;
-  legalTargets = [];
-  drawBoard();
-});
-$("resign").addEventListener("click", () => {
-  if (!game.game_over()) {
-    stopClock();
-    $("game-status").textContent =
-      `Abandon — ${game.turn() === "w" ? "Noirs" : "Blancs"} gagnent`;
-  }
-});
-$("copy-pgn").addEventListener("click", async () => {
-  try {
-    await navigator.clipboard.writeText(game.pgn());
-    $("copy-pgn").textContent = "Copié !";
-    setTimeout(() => $("copy-pgn").textContent = "Copier PGN", 1400);
-  } catch (error) {
-    alert(game.pgn() || "Aucun coup à copier.");
-  }
-});
-
-newGame();
-
-// Firebase Auth : configure js/firebase-config.js avant d'activer la connexion.
-import("./firebase.js").then(({ auth, googleProvider, signInWithPopup, signOut, onAuthStateChanged }) => {
-  if (!auth) return;
-
-  onAuthStateChanged(auth, user => {
-    $("auth-status").textContent = user ? (user.displayName || user.email || "Joueur connecté") : "Invité";
-    $("my-name").textContent = user ? (user.displayName || "Joueur") : "Vous";
-    $("login-google").classList.toggle("hidden", !!user);
-    $("logout").classList.toggle("hidden", !user);
-  });
-
-  $("login-google").addEventListener("click", async () => {
-    try {
-      await signInWithPopup(auth, googleProvider);
-    } catch (error) {
-      alert("Connexion impossible : " + error.message);
-    }
-  });
-
-  $("logout").addEventListener("click", () => signOut(auth));
-}).catch(() => {});
+import('./firebase.js').then(({auth,googleProvider,signInWithPopup,signOut,onAuthStateChanged})=>{if(!auth)return;onAuthStateChanged(auth,user=>{$('auth-status').textContent=user?(user.displayName||user.email||'Joueur connecté'):'Invité';$('my-name').textContent=user?(user.displayName||'Joueur'):'Vous';$('login-google').classList.toggle('hidden',!!user);$('logout').classList.toggle('hidden',!user);});$('login-google').addEventListener('click',async()=>{try{await signInWithPopup(auth,googleProvider);}catch(e){alert('Connexion impossible : '+e.message);}});$('logout').addEventListener('click',()=>signOut(auth));}).catch(()=>{});
