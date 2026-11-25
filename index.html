@@ -59,9 +59,36 @@
         </select>
         <label for="opponent">Adversaire</label>
         <select id="opponent">
-          <option value="computer">Ordinateur (coups aléatoires)</option>
+          <option value="computer">Ordinateur Stockfish</option>
           <option value="local">Deux joueurs sur cet appareil</option>
         </select>
+        <label for="engine-level">Niveau de Stockfish</label>
+        <select id="engine-level">
+          <option value="1">Débutant</option><option value="4">Facile</option><option value="7">Intermédiaire</option>
+          <option value="10" selected>Avancé</option><option value="15">Expert</option><option value="20">Maximum</option>
+        </select>
+        <label for="play-as">Jouer avec</label>
+        <select id="play-as"><option value="w">Les Blancs</option><option value="b">Les Noirs</option></select>
+        <div id="engine-status" class="engine-status">Moteur en attente</div>
+        <div class="settings-block">
+          <h3>Personnalisation</h3>
+          <label for="board-theme">Thème de l’échiquier</label>
+          <select id="board-theme">
+            <option value="classic">Classique</option><option value="lichess">Bois Lichess</option><option value="walnut">Noyer foncé</option><option value="oak">Chêne</option>
+            <option value="mahogany">Acajou</option><option value="pine">Pin</option><option value="tournament">Tournoi vert</option><option value="blue">Bleu</option>
+            <option value="midnight">Minuit</option><option value="purple">Violet</option><option value="rose">Rose</option><option value="sand">Sable</option>
+            <option value="marble">Marbre</option><option value="graphite">Graphite</option><option value="mint">Menthe</option><option value="coral">Corail</option>
+          </select>
+          <label for="move-sound">Son des déplacements</label>
+          <select id="move-sound"><option value="0">Classique</option><option value="1">Bois léger</option><option value="2">Bois profond</option><option value="3">Plastique</option><option value="4">Pierre</option><option value="5">Métal</option><option value="6">Verre</option><option value="7">Électronique</option><option value="8">Arcade</option><option value="9">Doux</option></select>
+          <label for="mate-sound">Son de l’échec et mat</label>
+          <select id="mate-sound"><option value="0">Classique</option><option value="1">Triomphal</option><option value="2">Solennel</option><option value="3">Arcade</option></select>
+        </div>
+        <div class="premove-box">
+          <label class="check-line"><input type="checkbox" id="premove-enabled"> Activer les prémoves (jusqu’à 5)</label>
+          <p id="premove-list">Aucun prémove en attente</p><small id="premove-feedback">Préparez un coup pendant que Stockfish réfléchit.</small>
+          <button id="clear-premoves" class="btn btn-ghost full">Annuler les prémoves</button>
+        </div>
         <button id="new-game" class="btn btn-primary full">Nouvelle partie</button>
         <div class="game-actions">
           <button id="undo" class="btn btn-ghost">↶ Annuler</button>
@@ -70,7 +97,13 @@
         <div class="status-box"><span class="status-label">ÉTAT DE LA PARTIE</span><strong id="game-status">À vous de jouer</strong><small id="turn-status">Trait aux Blancs</small></div>
         <div class="moves-title"><strong>Coups joués</strong><button id="copy-pgn" class="text-button">Copier PGN</button></div>
         <ol id="moves" class="moves"><li class="empty-moves">Les coups apparaîtront ici.</li></ol>
-        <p class="notice">Prototype : les parties sont locales à cet appareil. Le jeu en ligne, les classements officiels et les tournois seront ajoutés dans les prochaines étapes.</p>
+        <button id="analysis-btn" class="btn btn-primary full hidden">Analyser la partie</button>
+        <p id="game-over-note" class="analysis-note"></p>
+        <section id="analysis-results" class="analysis-results hidden">
+          <h3>Analyse de la partie</h3><p id="analysis-summary"></p>
+          <div class="analysis-table-wrap"><table><thead><tr><th>N°</th><th>Coup</th><th>Évaluation</th><th>Appréciation</th></tr></thead><tbody id="analysis-table"></tbody></table></div>
+        </section>
+        <p class="notice">Les parties restent locales sur cet appareil. Stockfish fonctionne dans le navigateur ; les comptes Firebase ne synchronisent pas encore les parties ni les classements.</p>
       </aside>
     </section>
 
