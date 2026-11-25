@@ -139,8 +139,9 @@ function setDifficulty(){
 
 function drawBoard(){
   boardEl.innerHTML="";
+  const view=premoves.length&&computer&&game.turn()==="b"?virtualGame():game;
   for(let r=0;r<8;r++)for(let c=0;c<8;c++){
-    const square=files[c]+(8-r),piece=game.get(square),el=document.createElement("button");
+    const square=files[c]+(8-r),piece=view.get(square),el=document.createElement("button");
     el.type="button";el.className=`square ${(r+c)%2===0?"light":"dark"}`;
     if(selected===square)el.classList.add("selected");if(legalTargets.includes(square))el.classList.add("target");
     if(premoveFrom===square)el.classList.add("premove-selected");
@@ -148,9 +149,9 @@ function drawBoard(){
     if(premoves.some(m=>m.to===square))el.classList.add("premove-to");
     if(lastMove&&(lastMove.from===square||lastMove.to===square))el.classList.add("last");
     if(piece){
-      const glyph=document.createElement("span");
-      glyph.className=`piece ${piece.color==="w"?"piece-white":"piece-black"}`;
-      glyph.textContent=symbols[piece.color+piece.type];
+      const glyph=document.createElement("img");
+      glyph.className="piece";glyph.alt="";glyph.draggable=false;
+      glyph.src=pieceSrc(piece.color,piece.type);
       el.appendChild(glyph);
     }
     if(r===7){const coord=document.createElement("span");coord.className="coordinate file-coordinate";coord.textContent=files[c].toUpperCase();el.appendChild(coord);}
@@ -158,7 +159,7 @@ function drawBoard(){
     el.setAttribute("aria-label",square+(piece?` ${piece.color==="w"?"blanc":"noir"} ${piece.type}`:""));
     el.addEventListener("click",()=>onSquare(square));boardEl.appendChild(el);
   }
-  renderMoves();renderStatus();renderPremoves();
+  drawArrows();renderMoves();renderStatus();renderPremoves();
 }
 function onSquare(square){
   if(pendingPromotion||gameFinished)return;
@@ -171,57 +172,54 @@ function onSquare(square){
   if(piece&&piece.color===game.turn()){selected=square;legalTargets=game.moves({square,verbose:true}).map(m=>m.to);}else{selected=null;legalTargets=[];}
   drawBoard();
 }
+function pieceSrc(color,type){return `pieces/${color}${type.toUpperCase()}.svg`;}
+function whiteToMove(g){const f=g.fen().split(" ");f[1]="w";f[3]="-";return new Chess(f.join(" "));}
+function premoveStep(g,p){const h=whiteToMove(g);return h.move({from:p.from,to:p.to,promotion:"q"})?h:null;}
+// Position affichée chez le joueur : position réelle + prémouvements, comme si l'adversaire ne bougeait pas.
+function virtualGame(){let g=new Chess(game.fen());for(const p of premoves){g=premoveStep(g,p)||g;}return g;}
 function queuePremoveClick(square){
   if(!computer||gameFinished)return;
-  const piece=game.get(square);
-  if(!premoveFrom){
-    const isWhitePiece=piece&&piece.color==="w";
-    const isPlannedDestination=premoves.some(move=>move.to===square);
-    if(isWhitePiece||isPlannedDestination){
-      premoveFrom=square;
-      $("premove-status").textContent=`Coup ${premoves.length+1}/5 : choisis la case d’arrivée de ${square.toUpperCase()}.`;
-      drawBoard();
-    }else{
-      $("premove-status").textContent="Sélectionne une pièce blanche (ou la destination d’un prémouvement déjà programmé).";
-    }
-    return;
-  }
-  if(square===premoveFrom){premoveFrom=null;$("premove-status").textContent="Sélection annulée.";drawBoard();return;}
-  if(piece&&piece.color==="w"&&!premoves.some(move=>move.to===square)){
-    premoveFrom=square;
-    $("premove-status").textContent=`Coup ${premoves.length+1}/5 : choisis la case d’arrivée de ${square.toUpperCase()}.`;
-    drawBoard();return;
-  }
-  if(premoves.length>=5){
-    $("premove-status").textContent="La file est pleine : cinq coups sont déjà programmés.";
-    premoveFrom=null;drawBoard();return;
-  }
-  premoves.push({from:premoveFrom,to:square,promotion:"q"});
-  premoveFrom=null;
-  $("premove-status").textContent=`${premoves.length}/5 coup(s) programmé(s). Ils seront vérifiés et joués à ton tour.`;
+  const f=whiteToMove(virtualGame()),piece=f.get(square),targetsOf=sq=>f.moves({square:sq,verbose:true}).map(m=>m.to);
+  const msg=$("premove-status");
+  if(premoveFrom&&legalTargets.includes(square)){
+    if(premoves.length>=5){msg.textContent="La file est pleine : 5 prémouvements maximum.";}
+    else{premoves.push({from:premoveFrom,to:square});msg.textContent=`${premoves.length}/5 prémouvement(s). Ils se jouent automatiquement dès que l’adversaire a joué.`;}
+    premoveFrom=null;legalTargets=[];
+  }else if(piece&&piece.color==="w"&&square!==premoveFrom){
+    premoveFrom=square;legalTargets=targetsOf(square);
+    msg.textContent=`Coup ${premoves.length+1}/5 : choisis la case d’arrivée.`;
+  }else{premoveFrom=null;legalTargets=[];}
   drawBoard();
 }
 function playNextPremove(){
   if(!premoves.length||gameFinished||game.turn()!=="w")return;
-  let p, legal;
-  while(premoves.length){
-    p=premoves.shift();
-    legal=game.moves({square:p.from,verbose:true}).find(m=>m.to===p.to);
-    if(legal)break;
+  const p=premoves.shift();premoveFrom=null;legalTargets=[];
+  if(!game.moves({square:p.from,verbose:true}).some(m=>m.to===p.to)){
+    premoves=[];$("premove-status").textContent="Prémouvement devenu impossible après le coup adverse : file annulée.";drawBoard();return;
   }
-  if(!legal){$("premove-status").textContent=`Prémouvement(s) devenu(s) illégal(aux), file vérifiée.`;renderPremoves();return;}
-  const piece=game.get(p.from);const promotion=piece&&piece.type==="p"&&(p.to.endsWith("8")||p.to.endsWith("1"))?"q":undefined;
-  const move=game.move({from:p.from,to:p.to,promotion});if(!move)return;
+  const move=game.move({from:p.from,to:p.to,promotion:"q"});
   lastMove=move;afterMove(true);
+}
+function drawArrows(){
+  const ns="http://www.w3.org/2000/svg",svg=document.createElementNS(ns,"svg");
+  svg.setAttribute("viewBox","0 0 8 8");svg.setAttribute("class","arrows");
+  const ctr=sq=>[files.indexOf(sq[0])+.5,8-Number(sq[1])+.5];
+  let html='<defs><marker id="ah" markerWidth="3.2" markerHeight="3.2" refX="2.2" refY="1.6" orient="auto"><path d="M0,0L3.2,1.6L0,3.2z" fill="#f0a030"/></marker></defs>';
+  premoves.forEach((p,i)=>{
+    const [x1,y1]=ctr(p.from),[x2,y2]=ctr(p.to),d=Math.hypot(x2-x1,y2-y1)||1,k=.3/d;
+    html+=`<line x1="${x1}" y1="${y1}" x2="${x2-(x2-x1)*k}" y2="${y2-(y2-y1)*k}" stroke="#f0a030" stroke-opacity=".85" stroke-width=".14" stroke-linecap="round" marker-end="url(#ah)"/>`;
+    html+=`<circle cx="${x2+.3}" cy="${y2-.3}" r=".18" fill="#10151d" stroke="#f0a030" stroke-width=".04"/><text x="${x2+.3}" y="${y2-.24}" font-size=".24" font-weight="700" text-anchor="middle" fill="#f0a030">${i+1}</text>`;
+  });
+  svg.innerHTML=html;boardEl.appendChild(svg);
 }
 function renderPremoves(){
   const el=$("premove-list");if(!el)return;
-  const queued=premoves.map((p,i)=>`${i+1}. ${p.from.toUpperCase()}–${p.to.toUpperCase()}`);
-  if(premoveFrom)queued.push(`${premoves.length+1}. ${premoveFrom.toUpperCase()}–…`);
+  const queued=premoves.map((p,i)=>`${i+1}. ${p.from}→${p.to}`);
+  if(premoveFrom)queued.push(`${premoves.length+1}. ${premoveFrom}→…`);
   el.textContent=queued.length?queued.join("  ·  "):"Aucun prémouvement";
   const clear=$("clear-premoves");if(clear)clear.disabled=!premoves.length&&!premoveFrom;
 }
-function showPromotionChooser(from,to,color){pendingPromotion={from,to};selected=from;const panel=document.querySelector(".board-panel");let chooser=$("promotion-chooser");if(!chooser){chooser=document.createElement("div");chooser.id="promotion-chooser";chooser.className="promotion-chooser";chooser.setAttribute("role","dialog");chooser.setAttribute("aria-modal","true");panel.appendChild(chooser);}const choices=[{type:"q",label:"Dame"},{type:"r",label:"Tour"},{type:"b",label:"Fou"},{type:"n",label:"Cavalier"}];chooser.innerHTML=`<div class="promotion-card"><strong>Promouvoir en…</strong><div class="promotion-options">${choices.map(c=>`<button type="button" class="promotion-choice" data-piece="${c.type}"><span>${symbols[color+c.type]}</span><small>${c.label}</small></button>`).join("")}</div></div>`;chooser.querySelectorAll("button").forEach(b=>b.addEventListener("click",()=>{const data=pendingPromotion;const promo=b.dataset.piece;closePromotionChooser();if(data)makeMove(data.from,data.to,promo);}));}
+function showPromotionChooser(from,to,color){pendingPromotion={from,to};selected=from;const panel=document.querySelector(".board-panel");let chooser=$("promotion-chooser");if(!chooser){chooser=document.createElement("div");chooser.id="promotion-chooser";chooser.className="promotion-chooser";chooser.setAttribute("role","dialog");chooser.setAttribute("aria-modal","true");panel.appendChild(chooser);}const choices=[{type:"q",label:"Dame"},{type:"r",label:"Tour"},{type:"b",label:"Fou"},{type:"n",label:"Cavalier"}];chooser.innerHTML=`<div class="promotion-card"><strong>Promouvoir en…</strong><div class="promotion-options">${choices.map(c=>`<button type="button" class="promotion-choice" data-piece="${c.type}"><img src="${pieceSrc(color,c.type)}" alt=""><small>${c.label}</small></button>`).join("")}</div></div>`;chooser.querySelectorAll("button").forEach(b=>b.addEventListener("click",()=>{const data=pendingPromotion;const promo=b.dataset.piece;closePromotionChooser();if(data)makeMove(data.from,data.to,promo);}));}
 function closePromotionChooser(){const el=$("promotion-chooser");if(el)el.remove();pendingPromotion=null;}
 function makeMove(from,to,promotion="q"){const move=game.move({from,to,promotion});if(!move){selected=null;legalTargets=[];drawBoard();return;}lastMove=move;selected=null;legalTargets=[];afterMove(true);}
 function afterMove(isHuman){
@@ -263,10 +261,11 @@ $("difficulty").addEventListener("input",setDifficulty);setDifficulty();
 $("opponent").addEventListener("change",()=>{if($("opponent").value==="computer")bootStockfish();});
 $("theme").addEventListener("change",e=>{document.documentElement.dataset.boardTheme=e.target.value;});
 $("clear-premoves").addEventListener("click",()=>{
-  premoves=[];premoveFrom=null;
+  premoves=[];premoveFrom=null;legalTargets=[];
   $("premove-status").textContent="La file de prémouvements a été effacée.";
   drawBoard();
 });
+boardEl.addEventListener("contextmenu",e=>{e.preventDefault();$("clear-premoves").click();});
 newGame(false);
 
 // Authentification Firebase existante : elle reste facultative à cette étape.
