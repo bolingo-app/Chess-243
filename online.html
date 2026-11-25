@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#10151d">
+  <title>Chess243 — Jouer en ligne</title>
+  <link rel="stylesheet" href="css/style.css">
+  <link rel="stylesheet" href="css/online.css">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/chess.js/0.10.3/chess.min.js"></script>
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="index.html"><span class="brand-mark">♞</span><span>CHESS<span class="accent">243</span></span></a>
+    <div class="account">
+      <span id="auth-status">Invité</span>
+      <button id="login-google" class="btn btn-small">Google</button>
+      <button id="logout" class="btn btn-small btn-ghost hidden">Quitter</button>
+    </div>
+  </header>
+  <main class="online">
+    <p id="msg">Connecte-toi avec Google pour jouer en ligne.</p>
+    <section id="lobby" hidden>
+      <div class="panel">
+        <h2>Jouer en ligne</h2>
+        <label for="tc">Cadence</label>
+        <select id="tc">
+          <option value="1|0">Bullet 1+0</option><option value="2|1">Bullet 2+1</option>
+          <option value="3|0">Blitz 3+0</option><option value="3|2">Blitz 3+2</option>
+          <option value="5|0" selected>Blitz 5+0</option><option value="5|3">Blitz 5+3</option>
+          <option value="10|0">Rapide 10+0</option><option value="15|0">Rapide 15+0</option><option value="30|0">Rapide 30+0</option>
+        </select>
+        <button id="btn-link" class="btn btn-primary full">Défier un ami (lien)</button>
+        <button id="btn-public" class="btn btn-ghost full">Publier un défi ouvert</button>
+      </div>
+      <div class="panel"><h3>Défis ouverts</h3><ul id="open-list" class="rows"><li><small>Aucun défi pour le moment.</small></li></ul></div>
+      <div class="panel">
+        <h3>Classements Elo</h3>
+        <div class="tabs"><button class="btn btn-small" data-c="bullet">Bullet</button><button class="btn btn-small on" data-c="blitz">Blitz</button><button class="btn btn-small" data-c="rapid">Rapide</button></div>
+        <p id="mine"></p>
+        <ol id="lb" class="rows"></ol>
+      </div>
+    </section>
+    <section id="game" hidden>
+      <div class="board-panel">
+        <div class="player-row"><div class="avatar">♟</div><div class="player-info"><strong id="top-name">—</strong><small id="top-sub"></small></div><div id="top-clock" class="clock">--:--</div></div>
+        <div id="board" class="board"></div>
+        <div class="player-row bottom-player"><div class="avatar you">♙</div><div class="player-info"><strong id="bot-name">—</strong><small id="bot-sub"></small></div><div id="bot-clock" class="clock">--:--</div></div>
+      </div>
+      <p id="game-status" class="game-status"></p>
+      <div class="game-btns"><button id="share" class="btn btn-ghost" type="button" hidden>Copier le lien</button><button id="resign" class="btn btn-ghost" type="button">Abandonner</button><button id="back" class="btn btn-ghost" type="button" hidden>Retour</button></div>
+    </section>
+  </main>
+  <script type="module" src="js/online.js"></script>
+</body>
+</html>
