@@ -143,6 +143,9 @@ function drawBoard(){
     const square=files[c]+(8-r),piece=game.get(square),el=document.createElement("button");
     el.type="button";el.className=`square ${(r+c)%2===0?"light":"dark"}`;
     if(selected===square)el.classList.add("selected");if(legalTargets.includes(square))el.classList.add("target");
+    if(premoveFrom===square)el.classList.add("premove-selected");
+    if(premoves.some(m=>m.from===square))el.classList.add("premove-from");
+    if(premoves.some(m=>m.to===square))el.classList.add("premove-to");
     if(lastMove&&(lastMove.from===square||lastMove.to===square))el.classList.add("last");
     if(piece){
       const glyph=document.createElement("span");
@@ -169,12 +172,33 @@ function onSquare(square){
   drawBoard();
 }
 function queuePremoveClick(square){
-  if(!engineThinking&&!engineBusy){setEngineStatus("En attente du tour des Blancs","ready");}
+  if(!computer||gameFinished)return;
   const piece=game.get(square);
-  if(!premoveFrom){if(piece&&piece.color==="w"){premoveFrom=square;$("premove-status").textContent=`Prémouvement : ${square} → …`;drawBoard();}return;}
-  if(piece&&piece.color==="w"){premoveFrom=square;$("premove-status").textContent=`Prémouvement : ${square} → …`;drawBoard();return;}
-  if(premoves.length>=5){$("premove-status").textContent="Maximum de 5 prémouvements atteint.";premoveFrom=null;return;}
-  premoves.push({from:premoveFrom,to:square,promotion:"q"});premoveFrom=null;$("premove-status").textContent=`${premoves.length}/5 prémouvement(s) en attente`;
+  if(!premoveFrom){
+    const isWhitePiece=piece&&piece.color==="w";
+    const isPlannedDestination=premoves.some(move=>move.to===square);
+    if(isWhitePiece||isPlannedDestination){
+      premoveFrom=square;
+      $("premove-status").textContent=`Coup ${premoves.length+1}/5 : choisis la case d’arrivée de ${square.toUpperCase()}.`;
+      drawBoard();
+    }else{
+      $("premove-status").textContent="Sélectionne une pièce blanche (ou la destination d’un prémouvement déjà programmé).";
+    }
+    return;
+  }
+  if(square===premoveFrom){premoveFrom=null;$("premove-status").textContent="Sélection annulée.";drawBoard();return;}
+  if(piece&&piece.color==="w"&&!premoves.some(move=>move.to===square)){
+    premoveFrom=square;
+    $("premove-status").textContent=`Coup ${premoves.length+1}/5 : choisis la case d’arrivée de ${square.toUpperCase()}.`;
+    drawBoard();return;
+  }
+  if(premoves.length>=5){
+    $("premove-status").textContent="La file est pleine : cinq coups sont déjà programmés.";
+    premoveFrom=null;drawBoard();return;
+  }
+  premoves.push({from:premoveFrom,to:square,promotion:"q"});
+  premoveFrom=null;
+  $("premove-status").textContent=`${premoves.length}/5 coup(s) programmé(s). Ils seront vérifiés et joués à ton tour.`;
   drawBoard();
 }
 function playNextPremove(){
@@ -190,7 +214,13 @@ function playNextPremove(){
   const move=game.move({from:p.from,to:p.to,promotion});if(!move)return;
   lastMove=move;afterMove(true);
 }
-function renderPremoves(){const el=$("premove-list");if(!el)return;el.textContent=premoves.length?premoves.map((p,i)=>`${i+1}. ${p.from}–${p.to}`).join(" · "):"Aucun prémouvement";}
+function renderPremoves(){
+  const el=$("premove-list");if(!el)return;
+  const queued=premoves.map((p,i)=>`${i+1}. ${p.from.toUpperCase()}–${p.to.toUpperCase()}`);
+  if(premoveFrom)queued.push(`${premoves.length+1}. ${premoveFrom.toUpperCase()}–…`);
+  el.textContent=queued.length?queued.join("  ·  "):"Aucun prémouvement";
+  const clear=$("clear-premoves");if(clear)clear.disabled=!premoves.length&&!premoveFrom;
+}
 function showPromotionChooser(from,to,color){pendingPromotion={from,to};selected=from;const panel=document.querySelector(".board-panel");let chooser=$("promotion-chooser");if(!chooser){chooser=document.createElement("div");chooser.id="promotion-chooser";chooser.className="promotion-chooser";chooser.setAttribute("role","dialog");chooser.setAttribute("aria-modal","true");panel.appendChild(chooser);}const choices=[{type:"q",label:"Dame"},{type:"r",label:"Tour"},{type:"b",label:"Fou"},{type:"n",label:"Cavalier"}];chooser.innerHTML=`<div class="promotion-card"><strong>Promouvoir en…</strong><div class="promotion-options">${choices.map(c=>`<button type="button" class="promotion-choice" data-piece="${c.type}"><span>${symbols[color+c.type]}</span><small>${c.label}</small></button>`).join("")}</div></div>`;chooser.querySelectorAll("button").forEach(b=>b.addEventListener("click",()=>{const data=pendingPromotion;const promo=b.dataset.piece;closePromotionChooser();if(data)makeMove(data.from,data.to,promo);}));}
 function closePromotionChooser(){const el=$("promotion-chooser");if(el)el.remove();pendingPromotion=null;}
 function makeMove(from,to,promotion="q"){const move=game.move({from,to,promotion});if(!move){selected=null;legalTargets=[];drawBoard();return;}lastMove=move;selected=null;legalTargets=[];afterMove(true);}
@@ -218,7 +248,7 @@ function newGame(shouldScroll=true){
   whiteSeconds=minutes*60;blackSeconds=minutes*60;incrementSeconds=increment||0;
   computer=$("opponent").value==="computer";
   $("opponent-label").textContent=computer?"Stockfish 19":"Deux joueurs";
-  $("premove-status").textContent="Les prémouvements sont disponibles pendant la réflexion de l’ordinateur.";
+  $("premove-status").textContent="Pendant le tour de l’ordinateur, sélectionne une pièce blanche puis sa destination pour programmer jusqu’à cinq coups.";
   if(computer){if(engineReady)setEngineStatus("Stockfish 19 prêt","ready");else bootStockfish();}
   else setEngineStatus("Mode deux joueurs","ready");
   drawBoard();
@@ -232,18 +262,10 @@ $("copy-pgn").addEventListener("click",async()=>{try{await navigator.clipboard.w
 $("difficulty").addEventListener("input",setDifficulty);setDifficulty();
 $("opponent").addEventListener("change",()=>{if($("opponent").value==="computer")bootStockfish();});
 $("theme").addEventListener("change",e=>{document.documentElement.dataset.boardTheme=e.target.value;});
-let boardPhotoUrl=null;
-$("board-photo").addEventListener("change",e=>{
-  const file=e.target.files&&e.target.files[0];if(!file)return;
-  if(!file.type.startsWith("image/")){alert("Choisis un fichier image valide.");e.target.value="";return;}
-  if(boardPhotoUrl)URL.revokeObjectURL(boardPhotoUrl);
-  boardPhotoUrl=URL.createObjectURL(file);
-  boardEl.style.backgroundImage=`url("${boardPhotoUrl}")`;
-  boardEl.classList.add("has-photo");
-});
-$("clear-board-photo").addEventListener("click",()=>{
-  if(boardPhotoUrl)URL.revokeObjectURL(boardPhotoUrl);boardPhotoUrl=null;
-  boardEl.style.backgroundImage="";boardEl.classList.remove("has-photo");$("board-photo").value="";
+$("clear-premoves").addEventListener("click",()=>{
+  premoves=[];premoveFrom=null;
+  $("premove-status").textContent="La file de prémouvements a été effacée.";
+  drawBoard();
 });
 newGame(false);
 
