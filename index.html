@@ -51,11 +51,23 @@
         <div class="panel-heading"><div><p class="eyebrow">NOUVELLE PARTIE</p><h2>À vous de jouer</h2></div><span class="live-dot"></span></div>
         <label for="mode">Cadence</label>
         <select id="mode">
-          <option value="1">Bullet · 1 min</option>
-          <option value="3">Blitz · 3 min</option>
-          <option value="5" selected>Blitz · 5 min</option>
-          <option value="10">Rapide · 10 min</option>
-          <option value="15">Rapide · 15 min</option>
+          <optgroup label="Bullet">
+            <option value="1|0">1+0 · 1 min sans incrément</option>
+            <option value="2|0">2+0 · 2 min sans incrément</option>
+            <option value="2|1">2+1 · 2 min + 1 s</option>
+          </optgroup>
+          <optgroup label="Blitz">
+            <option value="3|0">3+0 · 3 min sans incrément</option>
+            <option value="3|2">3+2 · 3 min + 2 s</option>
+            <option value="5|0" selected>5+0 · 5 min sans incrément</option>
+            <option value="5|3">5+3 · 5 min + 3 s</option>
+          </optgroup>
+          <optgroup label="Rapide">
+            <option value="10|0">10+0 · 10 min sans incrément</option>
+            <option value="15|0">15+0 · 15 min sans incrément</option>
+            <option value="20|0">20+0 · 20 min sans incrément</option>
+            <option value="30|0">30+0 · 30 min sans incrément</option>
+          </optgroup>
         </select>
         <label for="opponent">Adversaire</label>
         <select id="opponent">
@@ -65,19 +77,37 @@
         <div class="engine-panel">
           <div class="engine-heading"><strong>Moteur de jeu</strong><span id="engine-status" data-state="loading">Initialisation de Stockfish…</span></div>
           <label for="difficulty">Force de l’ordinateur</label>
-          <input id="difficulty" type="range" min="1" max="20" value="10">
-          <small id="difficulty-value">Niveau 10/20</small>
+          <input id="difficulty" type="range" min="1" max="19" value="10">
+          <small id="difficulty-value">Niveau 10/19</small>
         </div>
         <label for="theme">Thème de l’échiquier</label>
         <select id="theme">
-          <option value="classic">01 · Classique</option><option value="wood">02 · Bois naturel</option>
-          <option value="walnut">03 · Noyer</option><option value="oak">04 · Chêne</option><option value="maple">05 · Érable</option>
-          <option value="marble">06 · Marbre</option><option value="slate">07 · Ardoise</option><option value="ocean">08 · Océan</option>
-          <option value="ice">09 · Glace</option><option value="forest">10 · Forêt</option><option value="emerald">11 · Émeraude</option>
-          <option value="ruby">12 · Rubis</option><option value="sapphire">13 · Saphir</option><option value="violet">14 · Violet</option>
-          <option value="rose">15 · Rose</option><option value="sand">16 · Sable</option><option value="copper">17 · Cuivre</option>
-          <option value="midnight">18 · Minuit</option><option value="mono">19 · Monochrome</option><option value="highcontrast">20 · Contraste</option>
+          <option value="classic">01 · Gris classique</option>
+          <option value="blueprint">02 · Bleu ardoise</option>
+          <option value="walnut">03 · Bois noyer</option>
+          <option value="green">04 · Vert tournoi</option>
+          <option value="sandstone">05 · Sable chaud</option>
+          <option value="silver">06 · Argent monochrome</option>
+          <option value="ocean">07 · Océan profond</option>
+          <option value="forest">08 · Forêt</option>
+          <option value="ivory">09 · Ivoire</option>
+          <option value="midnight">10 · Minuit</option>
+          <option value="cobalt">11 · Cobalt</option>
+          <option value="copper">12 · Cuivre</option>
+          <option value="plum">13 · Prune</option>
+          <option value="rosewood">14 · Bois rosé</option>
+          <option value="emerald">15 · Émeraude</option>
+          <option value="slate">16 · Ardoise</option>
+          <option value="autumn">17 · Automne</option>
+          <option value="ice">18 · Glace</option>
+          <option value="graphite">19 · Graphite</option>
+          <option value="highcontrast">20 · Contraste net</option>
         </select>
+        <label for="board-photo">Photo d'arrière-plan de l'échiquier</label>
+        <div class="photo-controls">
+          <input id="board-photo" type="file" accept="image/*">
+          <button id="clear-board-photo" type="button" class="btn btn-ghost">Retirer la photo</button>
+        </div>
         <label for="move-sound">Son des déplacements (10 variantes)</label>
         <select id="move-sound"><option value="0">Bois léger</option><option value="1">Feutré</option><option value="2">Cristal</option><option value="3">Mécanique</option><option value="4">Classique</option><option value="5">Clair</option><option value="6">Doux</option><option value="7">Métallique</option><option value="8">Rapide</option><option value="9">Énergique</option></select>
         <label for="mate-sound">Son d’échec et mat (5 variantes)</label>
