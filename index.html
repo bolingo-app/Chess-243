@@ -1,0 +1,87 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#10151d">
+  <meta name="description" content="Joue aux échecs, entraîne-toi et progresse.">
+  <title>Chess243 — Échecs en ligne</title>
+  <link rel="stylesheet" href="css/style.css">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/chess.js/0.10.3/chess.min.js"></script>
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="#"><span class="brand-mark">♞</span><span>CHESS<span class="accent">243</span></span></a>
+    <nav><a href="#play">Jouer</a><a href="#profile">Profil</a></nav>
+    <div class="account">
+      <span id="auth-status">Invité</span>
+      <button id="login-google" class="btn btn-small">Google</button>
+      <button id="logout" class="btn btn-small btn-ghost hidden">Quitter</button>
+    </div>
+  </header>
+
+  <main>
+    <section class="hero">
+      <div>
+        <p class="eyebrow">LA COMMUNAUTÉ DES ÉCHECS</p>
+        <h1>Chaque coup<br><span class="accent">compte.</span></h1>
+        <p class="hero-copy">Joue, entraîne-toi et construis ton classement. La première version te permet déjà de jouer une partie locale contre l'ordinateur.</p>
+        <a class="btn btn-primary" href="#play">Commencer une partie <span>↗</span></a>
+      </div>
+      <div class="hero-stats">
+        <div><strong>3</strong><span>cadences prévues</span></div>
+        <div><strong>∞</strong><span>parties à jouer</span></div>
+      </div>
+    </section>
+
+    <section id="play" class="play-layout">
+      <div class="board-panel">
+        <div class="player-row">
+          <div class="avatar">♟</div><div class="player-info"><strong>Ordinateur</strong><small id="opponent-label">Adversaire</small></div>
+          <div id="black-clock" class="clock">05:00</div>
+        </div>
+        <div id="board" class="board" aria-label="Échiquier"></div>
+        <div class="player-row bottom-player">
+          <div class="avatar you">♙</div><div class="player-info"><strong id="my-name">Vous</strong><small>Blancs</small></div>
+          <div id="white-clock" class="clock active">05:00</div>
+        </div>
+      </div>
+
+      <aside class="game-panel">
+        <div class="panel-heading"><div><p class="eyebrow">NOUVELLE PARTIE</p><h2>À vous de jouer</h2></div><span class="live-dot"></span></div>
+        <label for="mode">Cadence</label>
+        <select id="mode">
+          <option value="1">Bullet · 1 min</option>
+          <option value="3">Blitz · 3 min</option>
+          <option value="5" selected>Blitz · 5 min</option>
+          <option value="10">Rapide · 10 min</option>
+          <option value="15">Rapide · 15 min</option>
+        </select>
+        <label for="opponent">Adversaire</label>
+        <select id="opponent">
+          <option value="computer">Ordinateur (coups aléatoires)</option>
+          <option value="local">Deux joueurs sur cet appareil</option>
+        </select>
+        <button id="new-game" class="btn btn-primary full">Nouvelle partie</button>
+        <div class="game-actions">
+          <button id="undo" class="btn btn-ghost">↶ Annuler</button>
+          <button id="resign" class="btn btn-ghost">Abandonner</button>
+        </div>
+        <div class="status-box"><span class="status-label">ÉTAT DE LA PARTIE</span><strong id="game-status">À vous de jouer</strong><small id="turn-status">Trait aux Blancs</small></div>
+        <div class="moves-title"><strong>Coups joués</strong><button id="copy-pgn" class="text-button">Copier PGN</button></div>
+        <ol id="moves" class="moves"><li class="empty-moves">Les coups apparaîtront ici.</li></ol>
+        <p class="notice">Prototype : les parties sont locales à cet appareil. Le jeu en ligne, les classements officiels et les tournois seront ajoutés dans les prochaines étapes.</p>
+      </aside>
+    </section>
+
+    <section id="profile" class="bottom-grid">
+      <article class="info-card"><span class="card-icon">🏆</span><h3>Classements Elo</h3><p>Bullet, blitz et rapide auront chacun leur propre classement.</p><span class="tag">À venir</span></article>
+      <article class="info-card"><span class="card-icon">⚔️</span><h3>Défis en ligne</h3><p>Invite tes amis et joue des parties en temps réel.</p><span class="tag">À venir</span></article>
+      <article class="info-card"><span class="card-icon">♜</span><h3>Tournois & groupes</h3><p>Organise des compétitions publiques ou privées.</p><span class="tag">À venir</span></article>
+    </section>
+  </main>
+  <footer>CHESS243 <span>·</span> Première version de développement</footer>
+
+  <script type="module" src="js/app.js"></script>
+</body>
+</html>
