@@ -103,11 +103,6 @@
           <option value="graphite">19 · Graphite</option>
           <option value="highcontrast">20 · Contraste net</option>
         </select>
-        <label for="board-photo">Photo d'arrière-plan de l'échiquier</label>
-        <div class="photo-controls">
-          <input id="board-photo" type="file" accept="image/*">
-          <button id="clear-board-photo" type="button" class="btn btn-ghost">Retirer la photo</button>
-        </div>
         <label for="move-sound">Son des déplacements (10 variantes)</label>
         <select id="move-sound"><option value="0">Bois léger</option><option value="1">Feutré</option><option value="2">Cristal</option><option value="3">Mécanique</option><option value="4">Classique</option><option value="5">Clair</option><option value="6">Doux</option><option value="7">Métallique</option><option value="8">Rapide</option><option value="9">Énergique</option></select>
         <label for="mate-sound">Son d’échec et mat (5 variantes)</label>
@@ -118,7 +113,11 @@
           <button id="resign" class="btn btn-ghost">Abandonner</button>
         </div>
         <div class="status-box"><span class="status-label">ÉTAT DE LA PARTIE</span><strong id="game-status">À vous de jouer</strong><small id="turn-status">Trait aux Blancs</small></div>
-        <div class="premove-panel"><strong>Prémouvements (maximum 5)</strong><p id="premove-status">Les prémouvements sont disponibles pendant la réflexion de l’ordinateur.</p><small id="premove-list">Aucun prémouvement</small></div>
+        <div class="premove-panel">
+          <div class="premove-heading"><strong>Prémouvements · maximum 5 coups</strong><button id="clear-premoves" type="button" class="text-button">Effacer</button></div>
+          <p id="premove-status">Pendant le tour de l’ordinateur, sélectionne une pièce blanche puis sa destination pour programmer un coup.</p>
+          <small id="premove-list">Aucun prémouvement</small>
+        </div>
         <div class="moves-title"><strong>Coups joués</strong><button id="copy-pgn" class="text-button">Copier PGN</button></div>
         <ol id="moves" class="moves"><li class="empty-moves">Les coups apparaîtront ici.</li></ol>
         <p class="notice">Prototype : les parties sont locales à cet appareil. Le jeu en ligne, les classements officiels et les tournois seront ajoutés dans les prochaines étapes.</p>
