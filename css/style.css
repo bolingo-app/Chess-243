@@ -178,3 +178,12 @@
 .board .arrows{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;z-index:4}
 .promotion-choice img{width:44px;height:44px;display:block;margin:0 auto}
 .square.target:before{content:"";position:absolute;left:36%;top:36%;width:28%;height:28%;border-radius:50%;background:rgba(0,0,0,.2);pointer-events:none;z-index:2}
+
+.board-actions{margin-top:14px;display:flex;flex-direction:column;gap:10px}
+.board-actions .game-actions{margin:0}
+.sheet{position:fixed;inset:0;z-index:50;background:rgba(6,9,13,.78);display:flex;align-items:flex-end;justify-content:center}
+.sheet.hidden{display:none}
+.sheet-card{width:100%;max-width:560px;max-height:88vh;overflow-y:auto;background:var(--panel,#161d27);border:1px solid var(--line);border-radius:18px 18px 0 0;padding:18px 18px 28px}
+.sheet-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:6px}
+.sheet-head h2{margin:0;font-size:20px}
+@media(min-width:761px){.sheet{align-items:center}.sheet-card{border-radius:18px}}
