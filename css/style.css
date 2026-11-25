@@ -104,14 +104,26 @@
   .promotion-chooser { inset: 13px; }
 }
 
-/* Personnalisation et outils de jeu */
-:root{--square-light:#e8dfc9;--square-dark:#78917f}
-.square.light{background:var(--square-light)}.square.dark{background:var(--square-dark)}
-.settings-block,.premove-box{margin-top:18px;padding:14px;border:1px solid var(--line);border-radius:11px;background:#101821}
-.settings-block h3,.analysis-results h3{margin:0 0 10px;font:600 14px 'Space Grotesk'}
-.engine-status{margin-top:10px;padding:9px 10px;border-radius:8px;background:#83a98a18;color:#a9c9ad;font-size:11px}
-.check-line{display:flex!important;align-items:center;gap:8px;margin:0!important;color:var(--text)!important}.check-line input{accent-color:var(--gold);width:17px;height:17px}
-.premove-box p{font-size:11px;color:var(--gold);line-height:1.5;overflow-wrap:anywhere}.premove-box small,.analysis-note{font-size:10px;color:var(--muted);line-height:1.5}
-.analysis-results{margin-top:14px;padding:13px;background:#101821;border:1px solid var(--line);border-radius:10px}.analysis-results p{font-size:11px;color:var(--muted);line-height:1.5}.analysis-table-wrap{overflow:auto;max-height:300px}
-.analysis-results table{width:100%;border-collapse:collapse;font-size:11px;white-space:nowrap}.analysis-results th,.analysis-results td{padding:8px 6px;border-bottom:1px solid var(--line);text-align:left}.analysis-results th{color:var(--gold)}
-.hidden{display:none!important}
+/* Chess243 — palettes personnalisées de l'échiquier */
+:root{--sq-light:#e8dfc9;--sq-dark:#78917f;--sq-piece-light:#20252b;--sq-piece-dark:#17211c}
+.square.light{background:var(--sq-light);color:var(--sq-piece-light)}.square.dark{background:var(--sq-dark);color:var(--sq-piece-dark)}
+:root[data-board-theme="wood"]{--sq-light:#e7c99b;--sq-dark:#98633f;--sq-piece-light:#3b2416;--sq-piece-dark:#fff0d6}
+:root[data-board-theme="walnut"]{--sq-light:#d8b58a;--sq-dark:#68452f;--sq-piece-light:#342013;--sq-piece-dark:#fff0d8}
+:root[data-board-theme="oak"]{--sq-light:#eed8ad;--sq-dark:#a97849;--sq-piece-light:#4b301b;--sq-piece-dark:#fff4df}
+:root[data-board-theme="maple"]{--sq-light:#f1dfbd;--sq-dark:#bd8d5b;--sq-piece-light:#49301c;--sq-piece-dark:#fff8e9}
+:root[data-board-theme="marble"]{--sq-light:#e7e7e5;--sq-dark:#777b83;--sq-piece-light:#25282e;--sq-piece-dark:#fff}
+:root[data-board-theme="slate"]{--sq-light:#c4cbd1;--sq-dark:#596674;--sq-piece-light:#202832;--sq-piece-dark:#f7fafc}
+:root[data-board-theme="ocean"]{--sq-light:#c4e5e8;--sq-dark:#347d91;--sq-piece-light:#163b49;--sq-piece-dark:#f1ffff}
+:root[data-board-theme="ice"]{--sq-light:#e6f5ff;--sq-dark:#83b8d8;--sq-piece-light:#24445a;--sq-piece-dark:#102d43}
+:root[data-board-theme="forest"]{--sq-light:#d7e2c3;--sq-dark:#58734c;--sq-piece-light:#263b20;--sq-piece-dark:#f4ffe9}
+:root[data-board-theme="emerald"]{--sq-light:#d0e8d8;--sq-dark:#27845c;--sq-piece-light:#16432e;--sq-piece-dark:#f0fff6}
+:root[data-board-theme="ruby"]{--sq-light:#f0d1d2;--sq-dark:#a74750;--sq-piece-light:#55232a;--sq-piece-dark:#fff1f1}
+:root[data-board-theme="sapphire"]{--sq-light:#d2def4;--sq-dark:#4268a5;--sq-piece-light:#20375e;--sq-piece-dark:#f5f8ff}
+:root[data-board-theme="violet"]{--sq-light:#e4d8f1;--sq-dark:#8060a2;--sq-piece-light:#3e2c55;--sq-piece-dark:#fff5ff}
+:root[data-board-theme="rose"]{--sq-light:#f5dce5;--sq-dark:#b66f8b;--sq-piece-light:#542c3d;--sq-piece-dark:#fff5f8}
+:root[data-board-theme="sand"]{--sq-light:#f0e2bd;--sq-dark:#b99b62;--sq-piece-light:#554321;--sq-piece-dark:#fff9e8}
+:root[data-board-theme="copper"]{--sq-light:#efd0b5;--sq-dark:#a65e3d;--sq-piece-light:#542d1e;--sq-piece-dark:#fff4e9}
+:root[data-board-theme="midnight"]{--sq-light:#78889d;--sq-dark:#29384d;--sq-piece-light:#142033;--sq-piece-dark:#f3f7ff}
+:root[data-board-theme="mono"]{--sq-light:#dedede;--sq-dark:#666;--sq-piece-light:#171717;--sq-piece-dark:#fff}
+:root[data-board-theme="highcontrast"]{--sq-light:#fff;--sq-dark:#111;--sq-piece-light:#000;--sq-piece-dark:#fff}
+.engine-panel,.premove-panel{margin-top:14px;padding:13px;background:var(--panel2);border:1px solid var(--line);border-radius:10px}.engine-heading{display:flex;flex-direction:column;gap:5px}.engine-heading strong,.premove-panel strong{font-size:12px}.engine-heading span,.engine-panel small,.premove-panel p,.premove-panel small{font-size:10px;color:var(--muted)}#engine-status[data-state="ready"]{color:#8ed5a0}#engine-status[data-state="thinking"]{color:#e9c16b}#engine-status[data-state="error"]{color:#ff8c8c}#engine-status[data-state="loading"]{color:#a9c8ef}.engine-panel input[type="range"]{width:100%;accent-color:var(--gold);margin:10px 0 2px}.premove-panel p{line-height:1.5;margin:7px 0}.premove-panel small{display:block;overflow-wrap:anywhere}
