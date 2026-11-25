@@ -1,4 +1,4 @@
-const CACHE="chess243-v2";
+const CACHE="chess243-v3";
 const SHELL=["./","index.html","css/style.css","js/app.js","js/firebase.js","js/firebase-config.js","manifest.webmanifest","icons/icon-192.png","icons/icon-512.png",
  ..."wK wQ wR wB wN wP bK bQ bR bB bN bP".split(" ").map(p=>`pieces/${p}.svg`),
  "engine/stockfish-19-lite-single.js?v=19.0.1","engine/stockfish-19-lite-single.wasm"];
