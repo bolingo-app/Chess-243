@@ -40,7 +40,7 @@ async function joinGame(id) {
 function openGame(id) {
   unsubGame && unsubGame(); gid = id; flagged = false; lastDelta = null; g = null;
   history.replaceState(null, "", "?g=" + id);
-  $("lobby").hidden = true; $("game").hidden = false; say("");
+  $("lobby").hidden = true; $("game").hidden = false; say(""); $("online").scrollIntoView({ behavior: "smooth" });
   unsubGame = fs.onSnapshot(gref(id), s => {
     if (!s.exists()) { say("Partie introuvable."); return; }
     g = s.data(); recvAt = performance.now(); sel = null; targets = [];
@@ -64,7 +64,7 @@ function render() {
   const name = s => g[s] ? g[s].name : "En attente…", sub = s => g[s] ? "Elo " + g[s].rating : "";
   $("top-name").textContent = name(top); $("top-sub").textContent = sub(top);
   $("bot-name").textContent = name(bot); $("bot-sub").textContent = sub(bot);
-  const b = $("board"); b.innerHTML = "";
+  const b = $("o-board"); b.innerHTML = "";
   const last = g.moves.length ? g.moves[g.moves.length - 1] : "";
   for (let i = 0; i < 8; i++) for (let j = 0; j < 8; j++) {
     const r = flip ? 7 - i : i, c = flip ? 7 - j : j, sq = files[c] + (8 - r), p = game.get(sq), el = document.createElement("button");
@@ -83,10 +83,10 @@ function render() {
     st = `${w} (${g.reason})` + (lastDelta !== null ? ` · Elo ${lastDelta >= 0 ? "+" : ""}${lastDelta}` : "");
   } else st = !myC ? "Spectateur" : g.turn === myC ? "À vous de jouer" : "Tour de l'adversaire";
   if (g.status === "active" && game.in_check()) st += " · Échec !";
-  $("game-status").textContent = st;
+  $("o-status").textContent = st;
   const over = g.status === "finished" || g.status === "aborted";
-  $("share").hidden = g.status !== "waiting"; $("back").hidden = !over; $("resign").hidden = over || !myC;
-  $("resign").textContent = g.status === "waiting" ? "Annuler le défi" : g.moves.length < 2 ? "Annuler la partie" : "Abandonner";
+  $("share").hidden = g.status !== "waiting"; $("back").hidden = !over; $("o-resign").hidden = over || !myC;
+  $("o-resign").textContent = g.status === "waiting" ? "Annuler le défi" : g.moves.length < 2 ? "Annuler la partie" : "Abandonner";
   tick();
 }
 
@@ -136,7 +136,7 @@ async function finish(cond, result, reason) {
   } catch (e) { flagged = false; }
 }
 
-$("resign").addEventListener("click", async () => {
+$("o-resign").addEventListener("click", async () => {
   if (!g || !myC) return;
   if (g.status === "waiting" || g.moves.length < 2) {
     await fs.runTransaction(db, async tx => {
@@ -201,12 +201,8 @@ $("btn-link").addEventListener("click", () => createGame("private"));
 $("btn-public").addEventListener("click", () => createGame("public"));
 
 if (auth) {
-  $("login-google").addEventListener("click", async () => { try { await signInWithPopup(auth, googleProvider); } catch (e) { alert("Connexion impossible : " + e.message); } });
-  $("logout").addEventListener("click", () => signOut(auth));
   onAuthStateChanged(auth, async user => {
-    $("auth-status").textContent = user ? (user.displayName || "Joueur") : "Invité";
-    $("login-google").classList.toggle("hidden", !!user); $("logout").classList.toggle("hidden", !user);
-    if (!user) { me = null; unsubLobby && unsubLobby(); unsubGame && unsubGame(); $("lobby").hidden = true; $("game").hidden = true; say("Connecte-toi avec Google pour jouer en ligne."); return; }
+    if (!user) { me = null; unsubLobby && unsubLobby(); unsubGame && unsubGame(); $("lobby").hidden = true; $("game").hidden = true; say(new URLSearchParams(location.search).get("g") ? "Connecte-toi avec Google (bouton en haut) pour rejoindre ce défi." : "Connecte-toi avec Google (bouton en haut) pour jouer en ligne."); return; }
     try {
       me = { uid: user.uid, name: user.displayName || "Joueur", data: await ensureUser(user) };
       say(""); startLobby(); loadBoard(lbCat); $("lobby").hidden = false;
