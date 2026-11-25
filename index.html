@@ -4,6 +4,9 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#10151d">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" href="icons/icon-192.png">
+  <link rel="apple-touch-icon" href="icons/icon-192.png">
   <meta name="description" content="Joue aux échecs, entraîne-toi et progresse.">
   <title>Chess243 — Échecs en ligne</title>
   <link rel="stylesheet" href="css/style.css">
@@ -14,6 +17,7 @@
     <a class="brand" href="#"><span class="brand-mark">♞</span><span>CHESS<span class="accent">243</span></span></a>
     <nav><a href="#play">Jouer</a><a href="#profile">Profil</a></nav>
     <div class="account">
+      <button id="install-app" class="btn btn-small hidden" type="button">Installer l’app</button>
       <span id="auth-status">Invité</span>
       <button id="login-google" class="btn btn-small">Google</button>
       <button id="logout" class="btn btn-small btn-ghost hidden">Quitter</button>
@@ -133,5 +137,6 @@
   <footer>CHESS243 <span>·</span> Première version de développement</footer>
 
   <script type="module" src="js/app.js"></script>
+  <script src="js/pwa.js"></script>
 </body>
 </html>

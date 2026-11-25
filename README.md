@@ -18,3 +18,8 @@ Cette version est une première démo locale : échiquier, règles de déplaceme
 Le multijoueur Internet, les classements officiels, les tournois et la validation serveur ne sont pas encore implémentés.
 
 Pour tester correctement, active GitHub Pages dans Settings > Pages > Deploy from a branch > main > /(root).
+
+## Mise à jour : pièces, prémouvements, installation
+- `pieces/` : 12 pièces SVG (style Lichess « cburnett »).
+- Prémouvements : jusqu'à 5, flèches numérotées, position anticipée affichée, joués automatiquement. Clic droit / appui long sur l'échiquier = effacer.
+- Installation : `manifest.webmanifest`, `sw.js`, `js/pwa.js`, `icons/`. Envoie aussi ces fichiers sur GitHub.
