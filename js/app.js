@@ -270,9 +270,3 @@ newGame(false);
 
 // Authentification Firebase existante : elle reste facultative à cette étape.
 import("./firebase.js").then(({auth,googleProvider,signInWithPopup,signOut,onAuthStateChanged})=>{if(!auth)return;onAuthStateChanged(auth,user=>{$("auth-status").textContent=user?(user.displayName||user.email||"Joueur connecté"):"Invité";$("my-name").textContent=user?(user.displayName||"Joueur"):"Vous";$("login-google").classList.toggle("hidden",!!user);$("logout").classList.toggle("hidden",!user);});$("login-google").addEventListener("click",async()=>{try{await signInWithPopup(auth,googleProvider);}catch(e){alert("Connexion impossible : "+e.message);}});$("logout").addEventListener("click",()=>signOut(auth));}).catch(()=>{});
-
-// Feuille « Options avancées » (thèmes, sons, prémouvements)
-{const sheet=$("options-sheet"),toggle=on=>{sheet.classList.toggle("hidden",!on);document.body.style.overflow=on?"hidden":"";};
-$("open-options").addEventListener("click",()=>toggle(true));$("close-options").addEventListener("click",()=>toggle(false));
-sheet.addEventListener("click",e=>{if(e.target===sheet)toggle(false);});
-addEventListener("keydown",e=>{if(e.key==="Escape")toggle(false);});}
