@@ -12,9 +12,7 @@ let gameFinished = false, premoveFrom = null, premoves = [];
 let engineInitTimer = null;
 
 const STOCKFISH_VERSION = "19.0.1";
-const STOCKFISH_BASE = `https://cdn.jsdelivr.net/npm/stockfish@${STOCKFISH_VERSION}/bin/`;
-const STOCKFISH_JS = `${STOCKFISH_BASE}stockfish-19-lite-single.js`;
-const STOCKFISH_WASM = `${STOCKFISH_BASE}stockfish-19-lite-single.wasm`;
+const STOCKFISH_WORKER_URL = new URL("../engine/stockfish-19-lite-single.js", import.meta.url);
 
 const MOVE_SOUNDS = [
   [520,760,"triangle"],[420,640,"sine"],[680,900,"triangle"],[350,520,"square"],[560,840,"sine"],
@@ -36,28 +34,43 @@ function bootStockfish(){
   if(!window.Worker){setEngineStatus("Navigateur incompatible avec Stockfish","error");return;}
   setEngineStatus("Téléchargement de Stockfish 19…","loading");
   try{
-    const bootstrap=`self.Module={locateFile:function(path){return ${JSON.stringify(STOCKFISH_BASE)}+path;}};importScripts(${JSON.stringify(STOCKFISH_JS)});`;
-    const blob=new Blob([bootstrap],{type:"text/javascript"});
-    const blobUrl=URL.createObjectURL(blob);
-    engine=new Worker(blobUrl);
+    // Le Worker et son fichier WASM sont servis localement depuis /engine/.
+    // Stockfish exige que le .wasm correspondant soit dans le même dossier que ce .js.
+    engine=new Worker(STOCKFISH_WORKER_URL,{name:"Chess243 Stockfish 19"});
     engine.addEventListener("message",onEngineMessage);
-    engine.addEventListener("error",e=>{console.error("Stockfish worker error",e);setEngineStatus("Stockfish indisponible — vérifiez la connexion ou le CDN","error");engineReady=false;engineThinking=false;});
+    engine.addEventListener("error",e=>{
+      console.error("Stockfish worker error",e);
+      engineReady=false;engineThinking=false;engineBusy=false;
+      setEngineStatus("Erreur de chargement Stockfish — vérifiez les deux fichiers dans /engine/","error");
+    });
     engine.postMessage("uci");
     clearTimeout(engineInitTimer);
-    engineInitTimer=setTimeout(()=>{if(!engineReady)setEngineStatus("Stockfish ne répond pas — rechargez la page","error");},25000);
-    engine._blobUrl=blobUrl;
+    engineInitTimer=setTimeout(()=>{
+      if(!engineReady)setEngineStatus("Stockfish ne répond pas — vérifiez les fichiers JS et WASM","error");
+    },30000);
   }catch(error){console.error(error);setEngineStatus("Impossible de lancer Stockfish","error");}
 }
 function onEngineMessage(event){
-  const line=String(event.data||"");
-  if(line.includes("uciok")){engine.postMessage("setoption name Threads value 1");engine.postMessage("setoption name Hash value 32");engine.postMessage(`setoption name Skill Level value ${Number($("difficulty")?.value||10)}`);engine.postMessage("isready");}
-  if(line.includes("readyok")){engineReady=true;clearTimeout(engineInitTimer);setEngineStatus("Stockfish 19 prêt","ready");if(computer&&game.turn()==="b"&&game.history().length)requestComputerMove();}
+  const line=String(event.data||"").trim();
+  if(line.includes("uciok")){
+    const level=Number($("difficulty")?.value||10);
+    engine.postMessage("setoption name Hash value 32");
+    engine.postMessage(`setoption name Skill Level value ${level}`);
+    engine.postMessage("isready");
+    return;
+  }
+  if(line.includes("readyok")){
+    engineReady=true;clearTimeout(engineInitTimer);
+    setEngineStatus("Stockfish 19 prêt","ready");
+    if(computer&&game.turn()==="b"&&game.history().length)requestComputerMove();
+    return;
+  }
   if(line.startsWith("bestmove")){
     engineThinking=false;engineBusy=false;
     const uci=line.split(/\s+/)[1];
     if(!uci||uci==="(none)"||gameFinished||!computer||game.turn()!=="b")return;
     const move=game.move({from:uci.slice(0,2),to:uci.slice(2,4),promotion:uci[4]||"q"});
-    if(!move){setEngineStatus("Stockfish a renvoyé un coup invalide","error");return;}
+    if(!move){setEngineStatus("Coup moteur invalide — partie conservée","error");return;}
     lastMove=move;afterMove(false);
     if(!gameFinished&&premoves.length)playNextPremove();
   }
@@ -67,11 +80,20 @@ function requestComputerMove(){
   engineBusy=true;engineThinking=true;setEngineStatus("Stockfish réfléchit…","thinking");
   const level=Number($("difficulty")?.value||10);
   const depth=Math.max(4,Math.min(18,Math.round(4+level*.65)));
-  engine.postMessage("stop");
   engine.postMessage(`position fen ${game.fen()}`);
   engine.postMessage(`go depth ${depth}`);
 }
-function setDifficulty(){if(!engineReady)return;const level=Number($("difficulty").value);engine.postMessage(`setoption name Skill Level value ${level}`);$("difficulty-value").textContent=`Niveau ${level}/20`;}
+function difficultyName(level){
+  if(level<=4)return "Débutant";
+  if(level<=9)return "Moyen";
+  if(level<=15)return "Avancé";
+  return "Très élevé";
+}
+function setDifficulty(){
+  const level=Number($("difficulty").value);
+  $("difficulty-value").textContent=`${difficultyName(level)} · Niveau ${level}/20`;
+  if(engineReady)engine.postMessage(`setoption name Skill Level value ${level}`);
+}
 
 function drawBoard(){
   boardEl.innerHTML="";
@@ -130,13 +152,13 @@ function renderStatus(){const over=game.game_over()||gameFinished;let status="À
 function startClock(){if(timer||gameFinished)return;running=true;timer=setInterval(()=>{if(game.turn()==="w")whiteSeconds--;else blackSeconds--;if(whiteSeconds<=0||blackSeconds<=0){stopClock();gameFinished=true;$("game-status").textContent=`Temps écoulé — ${whiteSeconds<=0?"Noirs":"Blancs"} gagnent`;$("turn-status").textContent="Partie terminée";setEngineStatus("Partie terminée","ready");}renderStatus();},1000);}
 function stopClock(){clearInterval(timer);timer=null;running=false;renderStatus();}
 function stopEngineSearch(){if(engine&&engineBusy){engine.postMessage("stop");engineBusy=false;engineThinking=false;}}
-function newGame(){stopClock();stopEngineSearch();closePromotionChooser();game.reset();selected=null;legalTargets=[];lastMove=null;gameFinished=false;premoves=[];premoveFrom=null;const minutes=Number($("mode").value);whiteSeconds=minutes*60;blackSeconds=minutes*60;computer=$("opponent").value==="computer";$("opponent-label").textContent=computer?"Stockfish 19":"Deux joueurs";$("premove-status").textContent="Les prémouvements sont disponibles pendant la réflexion de l'ordinateur.";if(computer){if(engineReady)setEngineStatus("Stockfish 19 prêt","ready");else bootStockfish();}else setEngineStatus("Mode deux joueurs","ready");drawBoard();}
+function newGame(){stopClock();stopEngineSearch();closePromotionChooser();game.reset();if(engineReady){engine.postMessage("ucinewgame");engine.postMessage("isready");}selected=null;legalTargets=[];lastMove=null;gameFinished=false;premoves=[];premoveFrom=null;const minutes=Number($("mode").value);whiteSeconds=minutes*60;blackSeconds=minutes*60;computer=$("opponent").value==="computer";$("opponent-label").textContent=computer?"Stockfish 19":"Deux joueurs";$("premove-status").textContent="Les prémouvements sont disponibles pendant la réflexion de l'ordinateur.";if(computer){if(engineReady)setEngineStatus("Stockfish 19 prêt","ready");else bootStockfish();}else setEngineStatus("Mode deux joueurs","ready");drawBoard();}
 
 $("new-game").addEventListener("click",newGame);
 $("undo").addEventListener("click",()=>{if(pendingPromotion)closePromotionChooser();stopEngineSearch();stopClock();if(game.history().length){game.undo();if(computer&&game.history().length)game.undo();}gameFinished=false;premoves=[];premoveFrom=null;lastMove=null;selected=null;legalTargets=[];drawBoard();});
 $("resign").addEventListener("click",()=>{if(!gameFinished&&!game.game_over()){gameFinished=true;stopClock();stopEngineSearch();$("game-status").textContent=`Abandon — ${game.turn()==="w"?"Noirs":"Blancs"} gagnent`;$ ("turn-status").textContent="Partie terminée";}});
 $("copy-pgn").addEventListener("click",async()=>{try{await navigator.clipboard.writeText(game.pgn());$("copy-pgn").textContent="Copié !";setTimeout(()=>$("copy-pgn").textContent="Copier PGN",1400);}catch(e){alert(game.pgn()||"Aucun coup à copier.");}});
-$("difficulty").addEventListener("input",setDifficulty);$("difficulty-value").textContent="Niveau 10/20";
+$("difficulty").addEventListener("input",setDifficulty);setDifficulty();
 $("opponent").addEventListener("change",()=>{if($("opponent").value==="computer")bootStockfish();});
 $("theme").addEventListener("change",e=>{document.documentElement.dataset.boardTheme=e.target.value;});
 newGame();
