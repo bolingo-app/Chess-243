@@ -12,7 +12,10 @@ let gameFinished = false, premoveFrom = null, premoves = [];
 let engineInitTimer = null;
 
 const STOCKFISH_VERSION = "19.0.1";
-const STOCKFISH_WORKER_URL = new URL("../engine/stockfish-19-lite-single.js", import.meta.url);
+const STOCKFISH_WORKER_URL = new URL("../engine/stockfish-19-lite-single.js?v="+STOCKFISH_VERSION, import.meta.url);
+const STOCKFISH_WASM_URL = new URL("../engine/stockfish-19-lite-single.wasm", import.meta.url).href;
+const STOCKFISH_CDN = `https://cdn.jsdelivr.net/npm/stockfish@${STOCKFISH_VERSION}/bin/stockfish-19-lite-single`;
+let engineAttempt = 0;
 
 const MOVE_SOUNDS = [
   [520,760,"triangle"],[420,640,"sine"],[680,900,"triangle"],[350,520,"square"],[560,840,"sine"],
@@ -29,26 +32,49 @@ function playMoveSound(){const s=MOVE_SOUNDS[Number($("move-sound")?.value||0)%M
 function playCheckmateSound(){const s=MATE_SOUNDS[Number($("mate-sound")?.value||0)%MATE_SOUNDS.length];tone(s[0],0,.18,"sine",.085);tone(s[1],.19,.22,"sine",.085);tone(s[2],.42,.42,"triangle",.09);}
 
 function setEngineStatus(message, state="") { const el=$("engine-status"); if(el){el.textContent=message;el.dataset.state=state;} }
+function killEngine(){
+  clearTimeout(engineInitTimer);
+  if(engine){try{engine.terminate();}catch(e){}if(engine._blobUrl)URL.revokeObjectURL(engine._blobUrl);}
+  engine=null;engineReady=false;engineThinking=false;engineBusy=false;
+}
+function createEngineWorker(source){
+  if(source==="local"){
+    // Indiquer explicitement le WASM évite toute ambiguïté de chemin sur GitHub Pages
+    // lorsque le dépôt est publié dans un sous-répertoire (username.github.io/projet/).
+    const workerUrl=STOCKFISH_WORKER_URL.href+"#"+encodeURIComponent(STOCKFISH_WASM_URL);
+    return new Worker(workerUrl,{name:"Chess243 Stockfish 19"});
+  }
+  // Secours : le .js vient du CDN via un Worker blob ; le .wasm est indiqué dans le #hash.
+  const blobUrl=URL.createObjectURL(new Blob([`importScripts(${JSON.stringify(STOCKFISH_CDN+".js")});`],{type:"text/javascript"}));
+  const w=new Worker(blobUrl+"#"+encodeURIComponent(STOCKFISH_CDN+".wasm"));
+  w._blobUrl=blobUrl;return w;
+}
+function startEngine(source){
+  const attempt=++engineAttempt;
+  killEngine();
+  setEngineStatus(source==="local"?"Chargement de Stockfish 19…":"Chargement de Stockfish 19 (secours CDN)…","loading");
+  const fail=reason=>{
+    if(attempt!==engineAttempt)return;
+    console.error("Stockfish ("+source+") :",reason);
+    killEngine();
+    if(source==="local"){startEngine("cdn");return;}
+    setEngineStatus("Stockfish introuvable — vérifiez que engine/stockfish-19-lite-single.js ET .wasm sont sur GitHub","error");
+  };
+  try{
+    engine=createEngineWorker(source);
+    engine.addEventListener("message",e=>{if(attempt===engineAttempt)onEngineMessage(e);});
+    engine.addEventListener("error",e=>fail(e.message||"erreur worker"));
+    engine.addEventListener("messageerror",()=>fail("message worker illisible"));
+    engine.postMessage("uci");
+    // Le téléchargement/compilation du WASM peut être lent sur mobile : ne pas
+    // basculer prématurément vers le CDN avant la fin de l'initialisation locale.
+    engineInitTimer=setTimeout(()=>{if(!engineReady)fail("initialisation trop longue");},source==="local"?45000:30000);
+  }catch(error){fail(error);}
+}
 function bootStockfish(){
   if(engine||!computer)return;
   if(!window.Worker){setEngineStatus("Navigateur incompatible avec Stockfish","error");return;}
-  setEngineStatus("Téléchargement de Stockfish 19…","loading");
-  try{
-    // Le Worker et son fichier WASM sont servis localement depuis /engine/.
-    // Stockfish exige que le .wasm correspondant soit dans le même dossier que ce .js.
-    engine=new Worker(STOCKFISH_WORKER_URL,{name:"Chess243 Stockfish 19"});
-    engine.addEventListener("message",onEngineMessage);
-    engine.addEventListener("error",e=>{
-      console.error("Stockfish worker error",e);
-      engineReady=false;engineThinking=false;engineBusy=false;
-      setEngineStatus("Erreur de chargement Stockfish — vérifiez les deux fichiers dans /engine/","error");
-    });
-    engine.postMessage("uci");
-    clearTimeout(engineInitTimer);
-    engineInitTimer=setTimeout(()=>{
-      if(!engineReady)setEngineStatus("Stockfish ne répond pas — vérifiez les fichiers JS et WASM","error");
-    },30000);
-  }catch(error){console.error(error);setEngineStatus("Impossible de lancer Stockfish","error");}
+  startEngine("local");
 }
 function onEngineMessage(event){
   const line=String(event.data||"").trim();
@@ -72,6 +98,7 @@ function onEngineMessage(event){
     const move=game.move({from:uci.slice(0,2),to:uci.slice(2,4),promotion:uci[4]||"q"});
     if(!move){setEngineStatus("Coup moteur invalide — partie conservée","error");return;}
     lastMove=move;afterMove(false);
+    if(!gameFinished)setEngineStatus("Stockfish 19 prêt","ready");
     if(!gameFinished&&premoves.length)playNextPremove();
   }
 }
