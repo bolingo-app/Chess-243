@@ -1,10 +1,8 @@
-// Remplace les valeurs ci-dessous par celles de TON application Web Firebase.
-// Firebase Console > Paramètres du projet > Vos applications > Configuration.
 export const firebaseConfig = {
-  apiKey: "REMPLACER_API_KEY",
-  authDomain: "REMPLACER_AUTH_DOMAIN",
-  projectId: "REMPLACER_PROJECT_ID",
-  storageBucket: "REMPLACER_STORAGE_BUCKET",
-  messagingSenderId: "REMPLACER_MESSAGING_SENDER_ID",
-  appId: "REMPLACER_APP_ID"
+  apiKey: "AIzaSyAd7wyYwPQY4QYWE04WsIF502ugP1rtspE",
+  authDomain: "chess243-e5194.firebaseapp.com",
+  projectId: "chess243-e5194",
+  storageBucket: "chess243-e5194.firebasestorage.app",
+  messagingSenderId: "936988534083",
+  appId: "1:936988534083:web:e175579e9632da02babbf6"
 };
