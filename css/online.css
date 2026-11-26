@@ -46,3 +46,14 @@ a.info-card{text-decoration:none;color:inherit;display:block}
 .drawer-card{width:88%;max-width:340px;height:100%;background:#161d27;padding:16px;overflow-y:auto}
 .drawer-card label{display:block;margin-top:14px}.drawer-card select{width:100%}
 .chk{display:flex!important;gap:10px;align-items:center}
+
+.home-line{display:flex;align-items:center;justify-content:space-between;gap:10px;margin:14px 0 8px}.home-line .home-eyebrow{margin:0}
+#account-btn{max-width:55vw;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.dot{display:inline-block;width:9px;height:9px;border-radius:50%;background:#59616b;margin-right:7px}.dot.on{background:#3ecf5a}
+.drawer-card #logout{margin-top:32px;width:100%}
+.invite{position:fixed;left:10px;right:10px;top:10px;z-index:80;background:#1b2633;border:1px solid var(--gold);border-radius:14px;padding:10px}
+.invite div{display:flex;align-items:center;gap:8px;flex-wrap:wrap}.invite span{flex:1}
+.prof-head{display:flex;align-items:center;gap:12px;margin-bottom:12px}.prof-head h2{margin:0}
+.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin:12px 0}.stats div{background:#202b37;border-radius:12px;padding:12px;text-align:center}.stats strong{display:block;font:700 22px 'Space Grotesk'}
+.panel input[type=text]{width:100%;padding:12px;border-radius:10px;border:1px solid var(--line);background:#202b37;color:inherit}
+.res-w{color:#7bc47f}.res-l{color:#d9534f}.res-d{color:#e6c04a}
