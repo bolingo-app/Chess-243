@@ -7,7 +7,8 @@
 <div class="panel"><div class="prof-head"><span id="dot" class="dot"></span><h2 id="pname"></h2></div><small id="pstate"></small>
 <div class="stats" id="stats"></div><p id="total"></p>
 <div id="own" hidden><label for="nick">Pseudo (2 à 20 caractères)</label><input type="text" id="nick" maxlength="20"><button id="save-nick" class="btn btn-primary full" type="button">Enregistrer le pseudo</button></div>
-<div id="other" hidden><label for="tc">Défier ce joueur</label><select id="tc"><option value="1|0">1+0</option><option value="3|0">3+0</option><option value="3|2">3+2</option><option value="5|0" selected>5+0</option><option value="10|0">10+0</option><option value="15|0">15+0</option></select><button id="challenge" class="btn btn-primary full" type="button">Envoyer le défi</button></div></div>
+<div id="other" hidden><label for="tc">Défier ce joueur</label><select id="tc"><option value="1|0">1+0</option><option value="3|0">3+0</option><option value="3|2">3+2</option><option value="5|0" selected>5+0</option><option value="10|0">10+0</option><option value="15|0">15+0</option></select><button id="challenge" class="btn btn-primary full" type="button">Envoyer le défi</button><button id="friend" class="btn btn-ghost full" type="button">Ajouter en ami</button></div></div>
+<div class="panel" id="friends-box" hidden><h3>Amis</h3><ul id="friends" class="rows"></ul></div>
 <div class="panel"><h3>Parties récentes</h3><ul id="games" class="rows"><li><small>Aucune partie.</small></li></ul></div></div></main>
 <script type="module">
 import { auth, db, fs, onAuthStateChanged } from "./js/firebase.js";
@@ -25,6 +26,18 @@ async function load() {
   $("stats").innerHTML = [["bullet", "Bullet"], ["blitz", "Blitz"], ["rapid", "Rapide"]].map(([c, n]) => `<div><small>${n}</small><strong>${data["rating_" + c]}</strong><small>${data["games_" + c] || 0} parties</small></div>`).join("");
   $("total").textContent = "Parties classées jouées : " + ["bullet", "blitz", "rapid"].reduce((a, c) => a + (data["games_" + c] || 0), 0);
   $("own").hidden = !own; $("other").hidden = own; $("nick").value = data.nick || data.name || "";
+  const mine = await fs.getDocs(fs.query(fs.collection(db, "chess_friends"), fs.where("uids", "array-contains", me.uid))), fid = [me.uid, target].sort().join("_");
+  const docs = mine.docs.map(d => ({ id: d.id, ...d.data() })), fd = docs.find(x => x.id === fid), fb = $("friend");
+  if (!own) { fb.textContent = !fd ? "Ajouter en ami" : fd.status === "accepted" ? "Amis ✓ (retirer)" : fd.from === me.uid ? "Demande envoyée (annuler)" : "Accepter la demande";
+    fb.onclick = async () => { const ref = fs.doc(db, "chess_friends", fid);
+      if (!fd) await fs.setDoc(ref, { uids: [me.uid, target].sort(), from: me.uid, status: "pending", names: { [me.uid]: me.displayName || "Joueur", [target]: data.nick || data.name } });
+      else if (fd.status === "pending" && fd.from !== me.uid) await fs.updateDoc(ref, { status: "accepted" }); else await fs.deleteDoc(ref); load(); }; }
+  $("friends-box").hidden = !own; const ul = $("friends"); ul.innerHTML = "";
+  if (own) docs.forEach(x => { const o = x.uids.find(u => u !== me.uid), li = document.createElement("li"), a = document.createElement("a"); a.href = "profile.html?u=" + o; a.style.color = "inherit"; a.textContent = x.names[o] || "Joueur";
+    li.appendChild(a); const st = document.createElement("small");
+    if (x.status === "accepted") { st.textContent = "Ami"; li.appendChild(st); }
+    else if (x.from !== me.uid) { const b = document.createElement("button"); b.className = "btn btn-small btn-primary"; b.textContent = "Accepter"; b.onclick = async () => { await fs.updateDoc(fs.doc(db, "chess_friends", x.id), { status: "accepted" }); load(); }; li.appendChild(b); }
+    else { st.textContent = "Demande envoyée"; li.appendChild(st); } ul.appendChild(li); });
   const snap = await fs.getDocs(fs.query(fs.collection(db, "chess_games"), fs.where("uids", "array-contains", target), fs.limit(60)));
   const rows = snap.docs.filter(d => d.data().status === "finished").sort((a, b) => (b.data().createdAt?.toMillis() || 0) - (a.data().createdAt?.toMillis() || 0)).slice(0, 15);
   if (rows.length) $("games").innerHTML = "";

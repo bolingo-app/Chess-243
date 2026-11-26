@@ -14,7 +14,7 @@ async function load(c) {
   const users = fs.collection(db, "chess_users"), f = "rating_" + c, ol = $("lb"); ol.innerHTML = "";
   const snap = await fs.getDocs(fs.query(users, fs.orderBy(f, "desc"), fs.limit(100)));
   snap.docs.forEach((d, i) => { const x = d.data(), li = document.createElement("li");
-    li.innerHTML = `<span>${i + 1}. <strong></strong></span><span>${x[f]} <small>(${x["games_" + c] || 0})</small></span>`;
+    li.innerHTML = `<span>${i + 1}. <a href="profile.html?u=${d.id}" style="color:inherit"><strong></strong></a></span><span>${x[f]} <small>(${x["games_" + c] || 0})</small></span>`;
     li.querySelector("strong").textContent = (x.nick || x.name) + (d.id === uid ? " (toi)" : ""); if (d.id === uid) li.style.color = "var(--gold)"; ol.appendChild(li); });
   $("mine").textContent = "";
   if (uid) { const me = await fs.getDoc(fs.doc(db, "chess_users", uid));
