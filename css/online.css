@@ -37,3 +37,12 @@ a.info-card{text-decoration:none;color:inherit;display:block}
 .an-list{list-style:none;margin:8px 0 0;padding:0}.an-list li{padding:9px 0;border-top:1px solid var(--line);display:flex;flex-wrap:wrap;align-items:center;gap:8px;cursor:pointer}
 .an-tag{color:#10151d;font-size:12px;font-weight:700;padding:2px 8px;border-radius:99px}.an-ev{margin-left:auto;opacity:.75}
 .an-more{width:100%;font-size:14px;opacity:.85}
+
+.board{position:relative}
+.board-panel,.play-layout>*{min-width:0;max-width:100%}
+.moves{position:relative;max-width:100%;overflow-x:auto;-webkit-overflow-scrolling:touch;scroll-snap-type:x proximity;gap:12px}
+.moves li{flex:0 0 calc((100% - 36px)/4);scroll-snap-align:start;text-align:center;overflow:hidden;text-overflow:ellipsis}
+.drawer{position:fixed;inset:0;z-index:70;background:rgba(6,9,13,.8)}
+.drawer-card{width:88%;max-width:340px;height:100%;background:#161d27;padding:16px;overflow-y:auto}
+.drawer-card label{display:block;margin-top:14px}.drawer-card select{width:100%}
+.chk{display:flex!important;gap:10px;align-items:center}
