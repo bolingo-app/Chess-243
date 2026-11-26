@@ -57,3 +57,6 @@ a.info-card{text-decoration:none;color:inherit;display:block}
 .stats{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin:12px 0}.stats div{background:#202b37;border-radius:12px;padding:12px;text-align:center}.stats strong{display:block;font:700 22px 'Space Grotesk'}
 .panel input[type=text]{width:100%;padding:12px;border-radius:10px;border:1px solid var(--line);background:#202b37;color:inherit}
 .res-w{color:#7bc47f}.res-l{color:#d9534f}.res-d{color:#e6c04a}
+.drawer-card input[type=text],.drawer-card input[type=password],.panel input[type=datetime-local],.panel input[type=text]{width:100%;padding:12px;border-radius:10px;border:1px solid var(--line);background:#202b37;color:inherit;margin-top:6px}
+#em-msg{min-height:20px;color:var(--gold)}
+.sec-title{margin:14px 0 4px;opacity:.7;font-size:13px;text-transform:uppercase;letter-spacing:.08em}
