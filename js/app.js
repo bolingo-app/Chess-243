@@ -1,10 +1,11 @@
+import { showAnalysis } from "./analysis.js";
 const boardEl = document.getElementById("board");
 const game = new Chess();
 const files = "abcdefgh";
 const symbols = {wk:"♔",wq:"♕",wr:"♖",wb:"♗",wn:"♘",wp:"♙",bk:"♚",bq:"♛",br:"♜",bb:"♝",bn:"♞",bp:"♟"};
 const $ = id => document.getElementById(id);
 
-let selected = null, legalTargets = [], lastMove = null, timer = null, engineMoveTimer = null;
+let viewPly = null, selected = null, legalTargets = [], lastMove = null, timer = null, engineMoveTimer = null;
 let whiteSeconds = 300, blackSeconds = 300, incrementSeconds = 0, running = false;
 let computer = true, pendingPromotion = null, audioContext = null;
 let engine = null, engineReady = false, engineThinking = false, engineBusy = false;
@@ -122,8 +123,8 @@ function requestComputerMove(){
     applyEngineStrength(level);
     const depth=Math.max(6,Math.min(18,Math.round(7+level*.58)));
     engine.postMessage(`position fen ${game.fen()}`);
-    engine.postMessage(`go depth ${depth}`);
-  },1500);
+    engine.postMessage(`go depth ${depth} movetime 500`);
+  },50);
 }
 function difficultyName(level){
   if(level<=4)return "Débutant";
@@ -139,7 +140,7 @@ function setDifficulty(){
 
 function drawBoard(){
   boardEl.innerHTML="";
-  const view=premoves.length&&computer&&game.turn()==="b"?virtualGame():game;
+  const hv=viewPly!==null?game.history({verbose:true}):null,view=viewPly!==null?gameAt(viewPly):premoves.length&&computer&&game.turn()==="b"?virtualGame():game,lm=hv?hv[viewPly-1]:lastMove;
   for(let r=0;r<8;r++)for(let c=0;c<8;c++){
     const square=files[c]+(8-r),piece=view.get(square),el=document.createElement("button");
     el.type="button";el.className=`square ${(r+c)%2===0?"light":"dark"}`;
@@ -147,7 +148,7 @@ function drawBoard(){
     if(premoveFrom===square)el.classList.add("premove-selected");
     if(premoves.some(m=>m.from===square))el.classList.add("premove-from");
     if(premoves.some(m=>m.to===square))el.classList.add("premove-to");
-    if(lastMove&&(lastMove.from===square||lastMove.to===square))el.classList.add("last");
+    if(lm&&(lm.from===square||lm.to===square))el.classList.add("last");
     if(piece){
       const glyph=document.createElement("img");
       glyph.className="piece";glyph.alt="";glyph.draggable=false;
@@ -162,6 +163,7 @@ function drawBoard(){
   drawArrows();renderMoves();renderStatus();renderPremoves();
 }
 function onSquare(square){
+  if(viewPly!==null)return;
   if(pendingPromotion||gameFinished)return;
   if(computer&&game.turn()==="b") { queuePremoveClick(square);return; }
   if(selected&&legalTargets.includes(square)){
@@ -223,6 +225,7 @@ function showPromotionChooser(from,to,color){pendingPromotion={from,to};selected
 function closePromotionChooser(){const el=$("promotion-chooser");if(el)el.remove();pendingPromotion=null;}
 function makeMove(from,to,promotion="q"){const move=game.move({from,to,promotion});if(!move){selected=null;legalTargets=[];drawBoard();return;}lastMove=move;selected=null;legalTargets=[];afterMove(true);}
 function afterMove(isHuman){
+  viewPly=null;
   // L'incrément est ajouté au joueur qui vient de terminer son coup.
   if(incrementSeconds>0){if(game.turn()==="b")whiteSeconds+=incrementSeconds;else blackSeconds+=incrementSeconds;}
   drawBoard();if(game.in_checkmate()){finishGame();return;}if(game.game_over()){gameFinished=true;stopClock();setEngineStatus("Partie terminée","ready");return;}
@@ -239,6 +242,7 @@ function stopEngineSearch(){
   engineBusy=false;engineThinking=false;
 }
 function newGame(shouldScroll=true){
+  viewPly=null;
   stopClock();stopEngineSearch();closePromotionChooser();game.reset();
   if(engineReady){engine.postMessage("ucinewgame");applyEngineStrength(Number($("difficulty").value));engine.postMessage("isready");}
   selected=null;legalTargets=[];lastMove=null;gameFinished=false;premoves=[];premoveFrom=null;
@@ -270,3 +274,12 @@ newGame(false);
 
 // Authentification Firebase existante : elle reste facultative à cette étape.
 import("./firebase.js").then(({auth,googleProvider,signInWithPopup,signOut,onAuthStateChanged})=>{if(!auth)return;onAuthStateChanged(auth,user=>{$("auth-status").textContent=user?(user.displayName||user.email||"Joueur connecté"):"Invité";$("my-name").textContent=user?(user.displayName||"Joueur"):"Vous";$("login-google").classList.toggle("hidden",!!user);$("logout").classList.toggle("hidden",!user);});$("login-google").addEventListener("click",async()=>{try{await signInWithPopup(auth,googleProvider);}catch(e){alert("Connexion impossible : "+e.message);}});$("logout").addEventListener("click",()=>signOut(auth));}).catch(()=>{});
+
+// Revoir les coups : flèches, liste des coups sous l'échiquier, analyse
+function gameAt(n){const g=new Chess();game.history().slice(0,n).forEach(s=>g.move(s));return g;}
+{const parent=boardEl.parentElement,nav=document.createElement("div");nav.className="nav-arrows";
+nav.innerHTML='<button type="button" id="nav-prev" class="btn btn-small">◀</button><button type="button" id="nav-next" class="btn btn-small">▶</button><button type="button" id="analyse-btn" class="btn btn-small">🔍 Analyser</button>';
+parent.append(nav,document.querySelector("#play .moves-title"),$("moves"));
+const go=d=>{const n=game.history().length;let p=(viewPly===null?n:viewPly)+d;p=Math.max(0,Math.min(n,p));viewPly=p===n?null:p;drawBoard();};
+$("nav-prev").onclick=()=>go(-1);$("nav-next").onclick=()=>go(1);
+$("analyse-btn").onclick=()=>showAnalysis(game.history());}

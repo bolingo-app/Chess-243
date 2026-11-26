@@ -1,3 +1,4 @@
+import { showAnalysis } from "./analysis.js";
 import { auth, db, fs, googleProvider, signInWithPopup, signOut, onAuthStateChanged } from "./firebase.js";
 const $ = id => document.getElementById(id), files = "abcdefgh";
 const cat = m => m < 3 ? "bullet" : m < 10 ? "blitz" : "rapid";
@@ -5,7 +6,7 @@ const expected = (a, b) => 1 / (1 + 10 ** ((b - a) / 400));
 const fmt = ms => { const s = Math.max(0, Math.ceil(ms / 1000)); return String(Math.floor(s / 60)).padStart(2, "0") + ":" + String(s % 60).padStart(2, "0"); };
 const gref = id => fs.doc(db, "chess_games", id), uref = id => fs.doc(db, "chess_users", id);
 const game = new Chess();
-let me = null, gid = null, g = null, myC = null, sel = null, targets = [], recvAt = 0;
+let viewPly = null, me = null, gid = null, g = null, myC = null, sel = null, targets = [], recvAt = 0;
 let unsubGame = null, flagged = false, applying = false, lastDelta = null;
 
 function say(t) { $("msg").textContent = t; $("msg").hidden = !t; }
@@ -36,7 +37,7 @@ function openGame(id) {
   say("");
   unsubGame = fs.onSnapshot(gref(id), s => {
     if (!s.exists()) { say("Partie introuvable."); return; }
-    g = s.data(); recvAt = performance.now(); sel = null; targets = [];
+    g = s.data(); recvAt = performance.now(); sel = null; targets = []; viewPly = null;
     if (g.status === "waiting" && searching) return;
     if (searching && g.status === "active") stopSearch();
     $("game").hidden = false; $("home").hidden = true; $("play").hidden = true; window.scrollTo(0, 0);
@@ -65,9 +66,9 @@ function render() {
   $("top-name").textContent = name(top); $("top-sub").textContent = sub(top);
   $("bot-name").textContent = name(bot); $("bot-sub").textContent = sub(bot);
   const b = $("o-board"); b.innerHTML = "";
-  const last = g.moves.length ? g.moves[g.moves.length - 1] : "";
+  const cur = viewPly === null ? g.moves.length : viewPly, src = viewPly === null ? game : replay(cur), last = cur ? g.moves[cur - 1] : "";
   for (let i = 0; i < 8; i++) for (let j = 0; j < 8; j++) {
-    const r = flip ? 7 - i : i, c = flip ? 7 - j : j, sq = files[c] + (8 - r), p = game.get(sq), el = document.createElement("button");
+    const r = flip ? 7 - i : i, c = flip ? 7 - j : j, sq = files[c] + (8 - r), p = src.get(sq), el = document.createElement("button");
     el.type = "button"; el.className = "square " + ((r + c) % 2 === 0 ? "light" : "dark");
     if (sel === sq) el.classList.add("selected");
     if (targets.includes(sq)) el.classList.add("target");
@@ -75,6 +76,9 @@ function render() {
     if (p) { const im = document.createElement("img"); im.className = "piece"; im.alt = ""; im.draggable = false; im.src = `pieces/${p.color}${p.type.toUpperCase()}.svg`; el.appendChild(im); }
     el.addEventListener("click", () => click(sq)); b.appendChild(el);
   }
+  const sans = sanAll(), ol = $("o-moves"); ol.innerHTML = "";
+  sans.forEach((s, i) => { const li = document.createElement("li"); li.textContent = (i % 2 ? "" : (i / 2 + 1) + ". ") + s; if (i + 1 === cur) li.className = "cur"; li.onclick = () => { viewPly = i + 1 === sans.length ? null : i + 1; render(); }; ol.appendChild(li); });
+  $("o-analyse").hidden = !(g.status === "finished" && sans.length);
   let st = "";
   if (g.status === "waiting") st = "En attente d'un adversaire… Partage le lien.";
   else if (g.status === "aborted") st = "Partie annulée.";
@@ -112,6 +116,7 @@ function tick() {
 setInterval(tick, 250);
 
 function click(sq) {
+  if (viewPly !== null) return;
   if (!g || g.status !== "active" || g.turn !== myC) return;
   if (sel && targets.includes(sq)) { play(sel, sq); return; }
   const p = game.get(sq);
@@ -268,3 +273,12 @@ if (auth) {
     } catch (e) { console.error(e); say("Erreur Firestore : " + e.message + " (règles publiées ?)"); }
   });
 }
+
+function replay(n) { const c = new Chess(); g.moves.slice(0, n).forEach(u => c.move({ from: u.slice(0, 2), to: u.slice(2, 4), promotion: u[4] })); return c; }
+function sanAll() { const c = new Chess(); return g.moves.map(u => c.move({ from: u.slice(0, 2), to: u.slice(2, 4), promotion: u[4] }).san); }
+{ const nav = document.createElement("div"); nav.className = "nav-arrows";
+  nav.innerHTML = '<button type="button" id="o-prev" class="btn btn-small">◀</button><button type="button" id="o-next" class="btn btn-small">▶</button><button type="button" id="o-analyse" class="btn btn-small" hidden>🔍 Analyser</button>';
+  const ol = document.createElement("ol"); ol.id = "o-moves"; ol.className = "moves";
+  $("o-board").parentElement.append(nav, ol);
+  const go = d => { if (!g) return; const n = g.moves.length; let p = (viewPly === null ? n : viewPly) + d; p = Math.max(0, Math.min(n, p)); viewPly = p === n ? null : p; render(); };
+  $("o-prev").onclick = () => go(-1); $("o-next").onclick = () => go(1); $("o-analyse").onclick = () => showAnalysis(sanAll()); }
