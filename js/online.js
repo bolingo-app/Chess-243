@@ -270,10 +270,10 @@ $("play-back").addEventListener("click", () => { $("play").hidden = true; $("hom
 
 if (auth) {
   onAuthStateChanged(auth, async user => {
-    if (!user) { me = null; unsubGame && unsubGame(); stopSearch(); say(new URLSearchParams(location.search).get("g") ? "Connecte-toi avec Google (bouton en haut) pour rejoindre ce défi." : "Connecte-toi avec Google (bouton en haut) pour jouer en ligne."); return; }
+    if (!user) { me = null; setAccount(null); clearInterval(hb); unsubInv && unsubInv(); unsubGame && unsubGame(); stopSearch(); say(new URLSearchParams(location.search).get("g") ? "Connecte-toi avec Google (bouton en haut) pour rejoindre ce défi." : "Connecte-toi avec Google (bouton en haut) pour jouer en ligne."); return; }
     try {
-      me = { uid: user.uid, name: user.displayName || "Joueur", data: await ensureUser(user) };
-      say("");
+      const data = await ensureUser(user); me = { uid: user.uid, name: data.nick || data.name || "Joueur", data };
+      setAccount(me); startPresence(); startInvites(); say("");
       const id = new URLSearchParams(location.search).get("g");
       if (id) { const s = await fs.getDoc(gref(id)); if (!s.exists()) say("Défi introuvable."); else if (s.data().status === "waiting" && s.data().creator.uid !== me.uid) joinGame(id); else openGame(id); }
     } catch (e) { console.error(e); say("Erreur Firestore : " + e.message + " (règles publiées ?)"); }
@@ -322,3 +322,26 @@ $("o-board").addEventListener("contextmenu", e => { e.preventDefault(); pm = [];
   $("premove-on").addEventListener("change", e => { localStorage.setItem("c243_premove", e.target.checked ? "1" : "0"); if (!e.target.checked) { pm = []; const c = $("clear-premoves"); c && c.click(); if (g) render(); } });
   btn.onclick = () => { dr.hidden = false; }; $("drawer-close").onclick = () => { dr.hidden = true; }; dr.addEventListener("click", e => { if (e.target === dr) dr.hidden = true; }); }
 { const ml = $("moves"); if (ml) new MutationObserver(() => { ml.scrollLeft = ml.scrollWidth; }).observe(ml, { childList: true }); }
+
+// En-tête : le nom du compte (cliquable → profil) remplace le bouton Google ; « Quitter » est dans le menu ☰
+const acc = document.createElement("button"); acc.id = "account-btn"; acc.type = "button"; acc.className = "btn btn-small"; acc.hidden = true;
+acc.onclick = () => { location.href = "profile.html"; };
+{ const gb = $("login-google"); gb.parentElement.insertBefore(acc, gb); const as = $("auth-status"); if (as) as.style.display = "none";
+  const lo = $("logout"), card = document.querySelector(".drawer-card"); if (lo && card) card.appendChild(lo); }
+function setAccount(m) { acc.hidden = !m; if (!m) return; acc.textContent = ""; const d = document.createElement("span"); d.className = "dot on"; acc.append(d, m.name); }
+let hb = null, unsubInv = null;
+function startPresence() {
+  clearInterval(hb); const beat = () => { if (!document.hidden) fs.updateDoc(uref(me.uid), { lastSeen: Date.now() }).catch(() => {}); };
+  beat(); hb = setInterval(beat, 30000); document.addEventListener("visibilitychange", beat);
+}
+function startInvites() {
+  unsubInv && unsubInv();
+  unsubInv = fs.onSnapshot(fs.query(fs.collection(db, "chess_games"), fs.where("status", "==", "waiting"), fs.where("invited", "==", me.uid), fs.limit(3)), s => {
+    let b = $("invite"); if (!b) { b = document.createElement("div"); b.id = "invite"; b.className = "invite"; document.body.appendChild(b); }
+    b.innerHTML = ""; const rows = s.docs.filter(d => { const t = d.data().createdAt; return !t || Date.now() - t.toMillis() < 600000; }); b.hidden = !rows.length;
+    rows.forEach(d => { const x = d.data(), row = document.createElement("div");
+      row.innerHTML = '<span></span><button class="btn btn-small btn-primary" type="button">Accepter</button><button class="btn btn-small" type="button">Refuser</button>';
+      row.querySelector("span").textContent = `${x.creator.name} te défie (${x.tcMin}+${x.tcInc})`;
+      const [ok, no] = row.querySelectorAll("button"); ok.onclick = () => joinGame(d.id); no.onclick = () => abortGame(d.id); b.appendChild(row); });
+  }, () => {});
+}
