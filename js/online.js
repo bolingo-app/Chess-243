@@ -1,5 +1,5 @@
 import { showAnalysis } from "./analysis.js";
-import { auth, db, fs, googleProvider, signInWithPopup, signOut, onAuthStateChanged } from "./firebase.js";
+import { auth, db, fs, googleProvider, signInWithPopup, signOut, onAuthStateChanged, createUserWithEmailAndPassword, signInWithEmailAndPassword, sendPasswordResetEmail, updateProfile } from "./firebase.js";
 const $ = id => document.getElementById(id), files = "abcdefgh";
 const cat = m => m < 3 ? "bullet" : m < 10 ? "blitz" : "rapid";
 const expected = (a, b) => 1 / (1 + 10 ** ((b - a) / 400));
@@ -14,7 +14,7 @@ if (!auth || !db) say("Firebase n'est pas configuré (js/firebase-config.js).");
 
 async function ensureUser(u) {
   const r = uref(u.uid), s = await fs.getDoc(r), base = { name: u.displayName || "Joueur", photo: u.photoURL || "" };
-  if (!s.exists()) await fs.setDoc(r, { ...base, rating_bullet: 1200, rating_blitz: 1200, rating_rapid: 1200, games_bullet: 0, games_blitz: 0, games_rapid: 0 });
+  if (!s.exists() || s.data().rating_blitz === undefined) await fs.setDoc(r, { ...base, rating_bullet: 1200, rating_blitz: 1200, rating_rapid: 1200, games_bullet: 0, games_blitz: 0, games_rapid: 0 }, { merge: true });
   else await fs.updateDoc(r, base);
   return (await fs.getDoc(r)).data();
 }
@@ -182,6 +182,7 @@ async function applyElo() {
       const d = (await tx.get(gref(gid))).data();
       if (d.applied && d.applied[me.uid]) return;
       tx.update(gref(gid), { ["applied." + me.uid]: true });
+      if (g.tid) tx.set(fs.doc(db, "chess_tournaments", g.tid, "players", me.uid), { name: me.name, points: fs.increment(s * 2), games: fs.increment(1) }, { merge: true });
       tx.update(uref(me.uid), { ["rating_" + g.cat]: fs.increment(delta), ["games_" + g.cat]: fs.increment(1) });
     });
     lastDelta = delta; me.data = (await fs.getDoc(uref(me.uid))).data(); render();
@@ -189,7 +190,7 @@ async function applyElo() {
   applying = false;
 }
 
-const candQuery = (m, i) => fs.query(fs.collection(db, "chess_games"), fs.where("status", "==", "waiting"), fs.where("vis", "==", "public"), fs.where("tcMin", "==", m), fs.where("tcInc", "==", i), fs.limit(20));
+const candQuery = (m, i, t) => fs.query(fs.collection(db, "chess_games"), fs.where("status", "==", "waiting"), fs.where("vis", "==", "public"), fs.where("tid", "==", t || null), fs.where("tcMin", "==", m), fs.where("tcInc", "==", i), fs.limit(20));
 let searching = null, cands = [], unsubCands = null, pairTimer = null, firstFlag = false;
 const win = () => 100 + 100 * Math.floor((Date.now() - searching.start) / 10000); // ±100, puis élargi toutes les 10 s
 const mineRating = c => me.data["rating_" + c];
@@ -208,31 +209,31 @@ function stopSearch() {
 async function abortGame(id) {
   try { await fs.runTransaction(db, async tx => { const d = (await tx.get(gref(id))).data(); if (d && d.status === "waiting") tx.update(gref(id), { status: "aborted" }); }); } catch (e) {}
 }
-async function quick(tc) {
+async function quick(tc, tid = null) {
   if (!me) { say("Connecte-toi avec Google (bouton en haut) pour jouer en ligne."); return; }
   if (searching) return;
   const [m, i] = tc.split("|").map(Number);
-  searching = { start: Date.now(), m, i, tc, id: null }; markTiles(); say("");
+  searching = { start: Date.now(), m, i, tc, tid, id: null }; markTiles(); say("");
   try {
-    cands = (await fs.getDocs(candQuery(m, i))).docs.map(d => ({ id: d.id, ...d.data() }));
+    cands = (await fs.getDocs(candQuery(m, i, tid))).docs.map(d => ({ id: d.id, ...d.data() }));
     const best = pick(100, m);
     if (best && await joinGame(best.id)) return;
     const [mm, ii] = [m, i], c = cat(m);
     const ref = await fs.addDoc(fs.collection(db, "chess_games"), {
-      status: "waiting", vis: "public", creator: { uid: me.uid, name: me.name, rating: mineRating(c) }, uids: [me.uid],
+      status: "waiting", vis: "public", tid, creator: { uid: me.uid, name: me.name, rating: mineRating(c) }, uids: [me.uid],
       tcMin: mm, tcInc: ii, cat: c, moves: [], fen: new Chess().fen(), turn: "w", wMs: mm * 60000, bMs: mm * 60000, createdAt: fs.serverTimestamp()
     });
     if (!searching) { abortGame(ref.id); return; }
     searching.id = ref.id; openGame(ref.id);
-    unsubCands = fs.onSnapshot(candQuery(m, i), s => { cands = s.docs.map(d => ({ id: d.id, ...d.data() })); });
+    unsubCands = fs.onSnapshot(candQuery(m, i, tid), s => { cands = s.docs.map(d => ({ id: d.id, ...d.data() })); });
     pairTimer = setInterval(async () => {
       if (!searching || !searching.id) return;
       $("search-text").textContent = `Recherche d'un adversaire… (écart Elo : ±${win() >= 700 ? "illimité" : win()})`;
       const b = pick(win() >= 700 ? 1e9 : win(), m);
       if (b && searching.id > b.id) {                       // le plus grand identifiant rejoint l'autre : pas de double appariement
-        const mine = searching.id, t = searching.tc;
+        const mine = searching.id, t = searching.tc, tv = searching.tid;
         unsubGame && unsubGame(); unsubGame = null; stopSearch(); await abortGame(mine);
-        if (!(await joinGame(b.id))) quick(t);
+        if (!(await joinGame(b.id))) quick(t, tv);
       }
     }, 2000);
   } catch (e) { console.error(e); stopSearch(); say("Erreur : " + e.message); }
@@ -274,7 +275,9 @@ if (auth) {
     try {
       const data = await ensureUser(user); me = { uid: user.uid, name: data.nick || data.name || "Joueur", data };
       setAccount(me); startPresence(); startInvites(); say("");
-      const id = new URLSearchParams(location.search).get("g");
+      const tp = new URLSearchParams(location.search), tid = tp.get("t");
+      if (tid) { history.replaceState(null, "", location.pathname); quick(tp.get("tc") || "5|0", tid); return; }
+      const id = tp.get("g");
       if (id) { const s = await fs.getDoc(gref(id)); if (!s.exists()) say("Défi introuvable."); else if (s.data().status === "waiting" && s.data().creator.uid !== me.uid) joinGame(id); else openGame(id); }
     } catch (e) { console.error(e); say("Erreur Firestore : " + e.message + " (règles publiées ?)"); }
   });
@@ -344,4 +347,22 @@ function startInvites() {
       row.querySelector("span").textContent = `${x.creator.name} te défie (${x.tcMin}+${x.tcInc})`;
       const [ok, no] = row.querySelectorAll("button"); ok.onclick = () => joinGame(d.id); no.onclick = () => abortGame(d.id); b.appendChild(row); });
   }, () => {});
+}
+
+// Connexion par e-mail
+if (auth) {
+  const eb = document.createElement("button"); eb.id = "email-btn"; eb.type = "button"; eb.className = "btn btn-small"; eb.textContent = "E-mail";
+  $("login-google").after(eb);
+  const dlg = document.createElement("div"); dlg.className = "drawer"; dlg.hidden = true;
+  dlg.innerHTML = '<div class="drawer-card"><div class="an-head"><strong>Connexion par e-mail</strong><button class="btn btn-small" type="button" id="em-close">Fermer</button></div><label for="em-nick">Pseudo (pour créer un compte)</label><input type="text" id="em-nick" maxlength="20"><label for="em-mail">E-mail</label><input type="text" id="em-mail" inputmode="email" autocomplete="email"><label for="em-pass">Mot de passe (6 caractères min.)</label><input type="password" id="em-pass" autocomplete="current-password"><p id="em-msg"></p><button id="em-in" class="btn btn-primary full" type="button">Se connecter</button><button id="em-new" class="btn btn-ghost full" type="button">Créer un compte</button><button id="em-reset" class="btn btn-small full" type="button">Mot de passe oublié</button></div>';
+  document.body.appendChild(dlg);
+  const msg = t => { $("em-msg").textContent = t; }, val = id => $(id).value.trim();
+  eb.onclick = () => { dlg.hidden = false; }; $("em-close").onclick = () => { dlg.hidden = true; };
+  const err = e => msg({ "auth/invalid-credential": "E-mail ou mot de passe incorrect.", "auth/email-already-in-use": "Cet e-mail a déjà un compte.", "auth/weak-password": "Mot de passe trop court.", "auth/invalid-email": "E-mail invalide.", "auth/operation-not-allowed": "E-mail/Mot de passe n'est pas activé dans Firebase." }[e.code] || e.message);
+  $("em-in").onclick = async () => { try { await signInWithEmailAndPassword(auth, val("em-mail"), $("em-pass").value); dlg.hidden = true; } catch (e) { err(e); } };
+  $("em-new").onclick = async () => {
+    if (val("em-nick").length < 2) { msg("Choisis un pseudo (2 caractères min.)."); return; }
+    try { const c = await createUserWithEmailAndPassword(auth, val("em-mail"), $("em-pass").value); await updateProfile(c.user, { displayName: val("em-nick") }); await fs.setDoc(uref(c.user.uid), { nick: val("em-nick") }, { merge: true }); dlg.hidden = true; location.reload(); } catch (e) { err(e); } };
+  $("em-reset").onclick = async () => { try { await sendPasswordResetEmail(auth, val("em-mail")); msg("E-mail de réinitialisation envoyé."); } catch (e) { err(e); } };
+  onAuthStateChanged(auth, u => { eb.classList.toggle("hidden", !!u); });
 }
