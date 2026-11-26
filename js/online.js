@@ -6,7 +6,7 @@ const expected = (a, b) => 1 / (1 + 10 ** ((b - a) / 400));
 const fmt = ms => { const s = Math.max(0, Math.ceil(ms / 1000)); return String(Math.floor(s / 60)).padStart(2, "0") + ":" + String(s % 60).padStart(2, "0"); };
 const gref = id => fs.doc(db, "chess_games", id), uref = id => fs.doc(db, "chess_users", id);
 const game = new Chess();
-let viewPly = null, me = null, gid = null, g = null, myC = null, sel = null, targets = [], recvAt = 0;
+let pm = [], viewPly = null, me = null, gid = null, g = null, myC = null, sel = null, targets = [], recvAt = 0;
 let unsubGame = null, flagged = false, applying = false, lastDelta = null;
 
 function say(t) { $("msg").textContent = t; $("msg").hidden = !t; }
@@ -32,7 +32,7 @@ async function joinGame(id) {
 }
 
 function openGame(id) {
-  unsubGame && unsubGame(); gid = id; flagged = false; firstFlag = false; lastDelta = null; g = null;
+  unsubGame && unsubGame(); gid = id; pm = []; flagged = false; firstFlag = false; lastDelta = null; g = null;
   history.replaceState(null, "", "?g=" + id);
   say("");
   unsubGame = fs.onSnapshot(gref(id), s => {
@@ -42,7 +42,8 @@ function openGame(id) {
     if (searching && g.status === "active") stopSearch();
     $("game").hidden = false; $("home").hidden = true; $("play").hidden = true; window.scrollTo(0, 0);
     myC = g.w && g.w.uid === me.uid ? "w" : g.b && g.b.uid === me.uid ? "b" : null;
-    game.load(g.fen); render();
+    game.load(g.fen); if (g.status !== "active") pm = []; render();
+    if (g.status === "active" && g.turn === myC && pm.length) { const p = pm.shift(); if (game.moves({ square: p.from, verbose: true }).some(m => m.to === p.to)) play(p.from, p.to); else { pm = []; render(); } }
     if (g.status === "finished") {
       applyElo();
       if (g.w && g.b && g.rematch && g.rematch[g.w.uid] && g.rematch[g.b.uid] && !g.next) makeRematch();
@@ -66,18 +67,22 @@ function render() {
   $("top-name").textContent = name(top); $("top-sub").textContent = sub(top);
   $("bot-name").textContent = name(bot); $("bot-sub").textContent = sub(bot);
   const b = $("o-board"); b.innerHTML = "";
-  const cur = viewPly === null ? g.moves.length : viewPly, src = viewPly === null ? game : replay(cur), last = cur ? g.moves[cur - 1] : "";
+  const cur = viewPly === null ? g.moves.length : viewPly, src = viewPly === null ? (pm.length && g.status === "active" && myC && g.turn !== myC ? virtual() : game) : replay(cur), last = cur ? g.moves[cur - 1] : "";
   for (let i = 0; i < 8; i++) for (let j = 0; j < 8; j++) {
     const r = flip ? 7 - i : i, c = flip ? 7 - j : j, sq = files[c] + (8 - r), p = src.get(sq), el = document.createElement("button");
     el.type = "button"; el.className = "square " + ((r + c) % 2 === 0 ? "light" : "dark");
     if (sel === sq) el.classList.add("selected");
     if (targets.includes(sq)) el.classList.add("target");
+    if (pm.some(p => p.from === sq)) el.classList.add("premove-from");
+    if (pm.some(p => p.to === sq)) el.classList.add("premove-to");
     if (last && (last.slice(0, 2) === sq || last.slice(2, 4) === sq)) el.classList.add("last");
     if (p) { const im = document.createElement("img"); im.className = "piece"; im.alt = ""; im.draggable = false; im.src = `pieces/${p.color}${p.type.toUpperCase()}.svg`; el.appendChild(im); }
     el.addEventListener("click", () => click(sq)); b.appendChild(el);
   }
+  arrows(flip);
   const sans = sanAll(), ol = $("o-moves"); ol.innerHTML = "";
   sans.forEach((s, i) => { const li = document.createElement("li"); li.textContent = (i % 2 ? "" : (i / 2 + 1) + ". ") + s; if (i + 1 === cur) li.className = "cur"; li.onclick = () => { viewPly = i + 1 === sans.length ? null : i + 1; render(); }; ol.appendChild(li); });
+  { const c = ol.querySelector(".cur"); if (c) ol.scrollLeft = c.offsetLeft - ol.clientWidth / 2 + c.clientWidth / 2; }
   $("o-analyse").hidden = !(g.status === "finished" && sans.length);
   let st = "";
   if (g.status === "waiting") st = "En attente d'un adversaire… Partage le lien.";
@@ -117,7 +122,8 @@ setInterval(tick, 250);
 
 function click(sq) {
   if (viewPly !== null) return;
-  if (!g || g.status !== "active" || g.turn !== myC) return;
+  if (!g || g.status !== "active" || !myC) return;
+  if (g.turn !== myC) { premoveClick(sq); return; }
   if (sel && targets.includes(sq)) { play(sel, sq); return; }
   const p = game.get(sq);
   if (p && p.color === myC) { sel = sq; targets = game.moves({ square: sq, verbose: true }).map(m => m.to); } else { sel = null; targets = []; }
@@ -282,3 +288,37 @@ function sanAll() { const c = new Chess(); return g.moves.map(u => c.move({ from
   $("o-board").parentElement.append(nav, ol);
   const go = d => { if (!g) return; const n = g.moves.length; let p = (viewPly === null ? n : viewPly) + d; p = Math.max(0, Math.min(n, p)); viewPly = p === n ? null : p; render(); };
   $("o-prev").onclick = () => go(-1); $("o-next").onclick = () => go(1); $("o-analyse").onclick = () => showAnalysis(sanAll()); }
+
+const pmOn = () => localStorage.getItem("c243_premove") !== "0";
+function forceMine(c) { const f = c.fen().split(" "); f[1] = myC; f[3] = "-"; return new Chess(f.join(" ")); }
+function virtual() { let c = game; for (const p of pm) { const h = forceMine(c); if (!h.move({ from: p.from, to: p.to, promotion: "q" })) break; c = h; } return c; }
+function premoveClick(sq) {
+  if (!pmOn()) return;
+  const f = forceMine(virtual()), p = f.get(sq);
+  if (sel && targets.includes(sq)) { if (pm.length < 5) pm.push({ from: sel, to: sq }); sel = null; targets = []; }
+  else if (p && p.color === myC && sq !== sel) { sel = sq; targets = f.moves({ square: sq, verbose: true }).map(m => m.to); }
+  else { sel = null; targets = []; }
+  render();
+}
+function arrows(flip) {
+  if (!pm.length) return;
+  const ns = "http://www.w3.org/2000/svg", svg = document.createElementNS(ns, "svg"); svg.setAttribute("viewBox", "0 0 8 8"); svg.setAttribute("class", "arrows");
+  const ctr = s => { const f = files.indexOf(s[0]), r = Number(s[1]); return [(flip ? 7 - f : f) + .5, (flip ? r - 1 : 8 - r) + .5]; };
+  let h = '<defs><marker id="oah" markerWidth="3.2" markerHeight="3.2" refX="2.2" refY="1.6" orient="auto"><path d="M0,0L3.2,1.6L0,3.2z" fill="#f0a030"/></marker></defs>';
+  pm.forEach((p, i) => { const [x1, y1] = ctr(p.from), [x2, y2] = ctr(p.to), d = Math.hypot(x2 - x1, y2 - y1) || 1, k = .3 / d;
+    h += `<line x1="${x1}" y1="${y1}" x2="${x2 - (x2 - x1) * k}" y2="${y2 - (y2 - y1) * k}" stroke="#f0a030" stroke-opacity=".85" stroke-width=".14" stroke-linecap="round" marker-end="url(#oah)"/><circle cx="${x2 + .3}" cy="${y2 - .3}" r=".18" fill="#10151d" stroke="#f0a030" stroke-width=".04"/><text x="${x2 + .3}" y="${y2 - .24}" font-size=".24" font-weight="700" text-anchor="middle" fill="#f0a030">${i + 1}</text>`; });
+  svg.innerHTML = h; $("o-board").appendChild(svg);
+}
+$("o-board").addEventListener("contextmenu", e => { e.preventDefault(); pm = []; sel = null; targets = []; if (g) render(); });
+
+// Menu ☰ des paramètres
+{ const hd = document.querySelector(".topbar"), btn = document.createElement("button"); btn.id = "menu-btn"; btn.type = "button"; btn.className = "btn btn-small"; btn.textContent = "☰"; hd.prepend(btn);
+  const dr = document.createElement("div"); dr.className = "drawer"; dr.hidden = true;
+  dr.innerHTML = '<div class="drawer-card"><div class="an-head"><strong>Paramètres</strong><button class="btn btn-small" type="button" id="drawer-close">Fermer</button></div><label class="chk"><input type="checkbox" id="premove-on"> Activer les prémouvements (5 coups max)</label><div id="drawer-body"></div></div>';
+  document.body.appendChild(dr); const body = $("drawer-body");
+  ["theme", "move-sound", "mate-sound"].forEach(id => { const lab = document.querySelector(`label[for="${id}"]`), el = $(id); if (lab) body.appendChild(lab); if (el) body.appendChild(el); });
+  const panel = document.querySelector("#play .premove-panel"); if (panel) body.appendChild(panel);
+  $("premove-on").checked = pmOn();
+  $("premove-on").addEventListener("change", e => { localStorage.setItem("c243_premove", e.target.checked ? "1" : "0"); if (!e.target.checked) { pm = []; const c = $("clear-premoves"); c && c.click(); if (g) render(); } });
+  btn.onclick = () => { dr.hidden = false; }; $("drawer-close").onclick = () => { dr.hidden = true; }; dr.addEventListener("click", e => { if (e.target === dr) dr.hidden = true; }); }
+{ const ml = $("moves"); if (ml) new MutationObserver(() => { ml.scrollLeft = ml.scrollWidth; }).observe(ml, { childList: true }); }

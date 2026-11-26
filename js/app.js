@@ -180,6 +180,7 @@ function premoveStep(g,p){const h=whiteToMove(g);return h.move({from:p.from,to:p
 // Position affichée chez le joueur : position réelle + prémouvements, comme si l'adversaire ne bougeait pas.
 function virtualGame(){let g=new Chess(game.fen());for(const p of premoves){g=premoveStep(g,p)||g;}return g;}
 function queuePremoveClick(square){
+  if(localStorage.getItem("c243_premove")==="0")return;
   if(!computer||gameFinished)return;
   const f=whiteToMove(virtualGame()),piece=f.get(square),targetsOf=sq=>f.moves({square:sq,verbose:true}).map(m=>m.to);
   const msg=$("premove-status");
