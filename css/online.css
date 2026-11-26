@@ -15,3 +15,15 @@
 .game-status{margin:14px 0 4px;font-weight:700}
 .game-btns{display:flex;gap:10px;margin-top:12px}
 .game-btns .btn{flex:1;margin:0}
+
+.home-eyebrow{margin:14px 0 8px}
+.tc-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+.tc{background:#202b37;border:1px solid var(--line);border-radius:12px;padding:14px 4px;color:inherit;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:2px}
+.tc strong{font:700 20px 'Space Grotesk'}.tc small{opacity:.65}
+.tc.on{outline:2px solid var(--gold)}.tc:disabled{opacity:.5}
+#search{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:12px}
+#cpu-level{width:100%}
+a.info-card{text-decoration:none;color:inherit;display:block}
+.status-box{display:none!important}
+@keyframes blink{50%{opacity:.35}}
+.blink{animation:blink .9s infinite}
