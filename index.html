@@ -26,20 +26,28 @@
   </header>
 
   <main>
-    <section class="hero">
-      <div>
-        <p class="eyebrow">LA COMMUNAUTÉ DES ÉCHECS</p>
-        <h1>Chaque coup<br><span class="accent">compte.</span></h1>
-        <p class="hero-copy">Joue, entraîne-toi et construis ton classement. La première version te permet déjà de jouer une partie locale contre l'ordinateur.</p>
-        <a class="btn btn-primary" href="#play">Commencer une partie <span>↗</span></a> <a class="btn btn-ghost" href="#online">Jouer en ligne</a>
+    <p class="eyebrow home-eyebrow">LA COMMUNAUTÉ DES ÉCHECS</p>
+    <p id="msg" hidden></p>
+    <div id="home">
+    <section id="online" class="online">
+      <div class="panel">
+        <h3>Jouer en ligne</h3>
+        <div class="tc-grid"><button class="tc" type="button" data-tc="1|0"><strong>1+0</strong><small>Bullet</small></button><button class="tc" type="button" data-tc="2|0"><strong>2+0</strong><small>Bullet</small></button><button class="tc" type="button" data-tc="2|1"><strong>2+1</strong><small>Bullet</small></button><button class="tc" type="button" data-tc="3|0"><strong>3+0</strong><small>Blitz</small></button><button class="tc" type="button" data-tc="3|2"><strong>3+2</strong><small>Blitz</small></button><button class="tc" type="button" data-tc="5|0"><strong>5+0</strong><small>Blitz</small></button><button class="tc" type="button" data-tc="5|1"><strong>5+1</strong><small>Blitz</small></button><button class="tc" type="button" data-tc="5|3"><strong>5+3</strong><small>Blitz</small></button><button class="tc" type="button" data-tc="10|0"><strong>10+0</strong><small>Rapide</small></button><button class="tc" type="button" data-tc="15|0"><strong>15+0</strong><small>Rapide</small></button><button class="tc" type="button" data-tc="20|0"><strong>20+0</strong><small>Rapide</small></button><button class="tc" type="button" data-tc="30|0"><strong>30+0</strong><small>Rapide</small></button></div>
+        <div id="search" hidden><span id="search-text">Recherche d'un adversaire…</span><button id="cancel-search" class="btn btn-small" type="button">Annuler</button></div>
       </div>
-      <div class="hero-stats">
-        <div><strong>3</strong><span>cadences prévues</span></div>
-        <div><strong>∞</strong><span>parties à jouer</span></div>
+      <div class="panel">
+        <h3>Jouer contre l'ordinateur</h3>
+        <label for="cpu-tc">Cadence</label><select id="cpu-tc"><option value="1|0">1+0</option><option value="2|0">2+0</option><option value="2|1">2+1</option><option value="3|0">3+0</option><option value="3|2">3+2</option><option value="5|0" selected>5+0</option><option value="5|1">5+1</option><option value="5|3">5+3</option><option value="10|0">10+0</option><option value="15|0">15+0</option><option value="20|0">20+0</option><option value="30|0">30+0</option></select>
+        <label for="cpu-level">Niveau de l'ordinateur</label><input id="cpu-level" type="range" min="1" max="19" value="10"><small id="cpu-level-text">Niveau 10/19</small>
+        <button id="cpu-start" class="btn btn-primary full" type="button">Jouer</button>
       </div>
     </section>
-
-    <section id="play" class="play-layout">
+    <section id="profile" class="bottom-grid">
+      <a class="info-card" href="classements.html"><span class="card-icon">🏆</span><h3>Classements Elo</h3><p>Bullet, blitz et rapide : les meilleurs joueurs et ta position.</p><span class="tag">Disponible</span></a>
+      <article class="info-card"><span class="card-icon">♜</span><h3>Tournois & groupes</h3><p>Organise des compétitions publiques ou privées.</p><span class="tag">À venir</span></article>
+    </section>
+  </div>
+    <section id="play" class="play-layout" hidden>
       <div class="board-panel">
         <div class="player-row">
           <div class="avatar">♟</div><div class="player-info"><strong>Ordinateur</strong><small id="opponent-label">Adversaire</small></div>
@@ -117,6 +125,7 @@
           <button id="undo" class="btn btn-ghost">↶ Annuler</button>
           <button id="resign" class="btn btn-ghost">Abandonner</button>
         </div>
+        <button id="play-back" class="btn btn-ghost full" type="button">← Accueil</button>
         <div class="status-box"><span class="status-label">ÉTAT DE LA PARTIE</span><strong id="game-status">À vous de jouer</strong><small id="turn-status">Trait aux Blancs</small></div>
         <div class="premove-panel">
           <div class="premove-heading"><strong>Prémouvements · maximum 5 coups</strong><button id="clear-premoves" type="button" class="text-button">Effacer</button></div>
@@ -128,30 +137,6 @@
         <p class="notice">Prototype : les parties sont locales à cet appareil. Le jeu en ligne, les classements officiels et les tournois seront ajoutés dans les prochaines étapes.</p>
       </aside>
     </section>
-
-    <section id="online" class="online">
-      <p id="msg">Connecte-toi avec Google pour jouer en ligne.</p>
-    <section id="lobby" hidden>
-      <div class="panel">
-        <h2>Jouer en ligne</h2>
-        <label for="tc">Cadence</label>
-        <select id="tc">
-          <option value="1|0">Bullet 1+0</option><option value="2|1">Bullet 2+1</option>
-          <option value="3|0">Blitz 3+0</option><option value="3|2">Blitz 3+2</option>
-          <option value="5|0" selected>Blitz 5+0</option><option value="5|3">Blitz 5+3</option>
-          <option value="10|0">Rapide 10+0</option><option value="15|0">Rapide 15+0</option><option value="30|0">Rapide 30+0</option>
-        </select>
-        <button id="btn-link" class="btn btn-primary full">Défier un ami (lien)</button>
-        <button id="btn-public" class="btn btn-ghost full">Publier un défi ouvert</button>
-      </div>
-      <div class="panel"><h3>Défis ouverts</h3><ul id="open-list" class="rows"><li><small>Aucun défi pour le moment.</small></li></ul></div>
-      <div class="panel">
-        <h3>Classements Elo</h3>
-        <div class="tabs"><button class="btn btn-small" data-c="bullet">Bullet</button><button class="btn btn-small on" data-c="blitz">Blitz</button><button class="btn btn-small" data-c="rapid">Rapide</button></div>
-        <p id="mine"></p>
-        <ol id="lb" class="rows"></ol>
-      </div>
-    </section>
     <section id="game" hidden>
       <div class="board-panel">
         <div class="player-row"><div class="avatar">♟</div><div class="player-info"><strong id="top-name">—</strong><small id="top-sub"></small></div><div id="top-clock" class="clock">--:--</div></div>
@@ -159,14 +144,7 @@
         <div class="player-row bottom-player"><div class="avatar you">♙</div><div class="player-info"><strong id="bot-name">—</strong><small id="bot-sub"></small></div><div id="bot-clock" class="clock">--:--</div></div>
       </div>
       <p id="o-status" class="game-status"></p>
-      <div class="game-btns"><button id="share" class="btn btn-ghost" type="button" hidden>Copier le lien</button><button id="o-resign" class="btn btn-ghost" type="button">Abandonner</button><button id="back" class="btn btn-ghost" type="button" hidden>Retour</button></div>
-    </section>
-    </section>
-
-    <section id="profile" class="bottom-grid">
-      <article class="info-card"><span class="card-icon">🏆</span><h3>Classements Elo</h3><p>Bullet, blitz et rapide auront chacun leur propre classement.</p><span class="tag">Disponible</span></article>
-      <article class="info-card"><span class="card-icon">⚔️</span><h3>Défis en ligne</h3><p>Invite tes amis et joue des parties en temps réel.</p><span class="tag">Disponible</span></article>
-      <article class="info-card"><span class="card-icon">♜</span><h3>Tournois & groupes</h3><p>Organise des compétitions publiques ou privées.</p><span class="tag">À venir</span></article>
+      <div class="game-btns"><button id="share" class="btn btn-ghost" type="button" hidden>Copier le lien</button><button id="o-resign" class="btn btn-ghost" type="button">Abandonner</button><button id="rematch" class="btn btn-primary" type="button" hidden>Nouvelle partie</button><button id="back" class="btn btn-ghost" type="button" hidden>Accueil</button></div>
     </section>
   </main>
   <footer>CHESS243 <span>·</span> Première version de développement</footer>

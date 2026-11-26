@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="theme-color" content="#10151d">
+<title>Chess243 — Classements</title><link rel="stylesheet" href="css/style.css"><link rel="stylesheet" href="css/online.css"></head>
+<body>
+<header class="topbar"><a class="brand" href="./"><span class="brand-mark">♞</span><span>CHESS<span class="accent">243</span></span></a><a class="btn btn-small" href="./">← Accueil</a></header>
+<main class="online"><div class="panel"><h3>Classements Elo</h3>
+<div class="tabs"><button class="btn btn-small" data-c="bullet">Bullet</button><button class="btn btn-small on" data-c="blitz">Blitz</button><button class="btn btn-small" data-c="rapid">Rapide</button></div>
+<p id="mine"></p><ol id="lb" class="rows"></ol></div></main>
+<script type="module">
+import { auth, db, fs, onAuthStateChanged } from "./js/firebase.js";
+const $ = id => document.getElementById(id); let uid = null;
+async function load(c) {
+  document.querySelectorAll(".tabs .btn").forEach(b => b.classList.toggle("on", b.dataset.c === c));
+  const users = fs.collection(db, "chess_users"), f = "rating_" + c, ol = $("lb"); ol.innerHTML = "";
+  const snap = await fs.getDocs(fs.query(users, fs.orderBy(f, "desc"), fs.limit(100)));
+  snap.docs.forEach((d, i) => { const x = d.data(), li = document.createElement("li");
+    li.innerHTML = `<span>${i + 1}. <strong></strong></span><span>${x[f]} <small>(${x["games_" + c] || 0})</small></span>`;
+    li.querySelector("strong").textContent = x.name + (d.id === uid ? " (toi)" : ""); if (d.id === uid) li.style.color = "var(--gold)"; ol.appendChild(li); });
+  $("mine").textContent = "";
+  if (uid) { const me = await fs.getDoc(fs.doc(db, "chess_users", uid));
+    if (me.exists()) { const r = me.data()[f], n = (await fs.getCountFromServer(fs.query(users, fs.where(f, ">", r)))).data().count;
+      $("mine").textContent = `Ta position : ${n + 1}e · Elo ${r}`; } }
+}
+document.querySelectorAll(".tabs .btn").forEach(b => b.addEventListener("click", () => load(b.dataset.c)));
+if (auth) onAuthStateChanged(auth, u => { uid = u ? u.uid : null; load("blitz"); }); else $("mine").textContent = "Firebase non configuré.";
+</script></body></html>
