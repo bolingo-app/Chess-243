@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="theme-color" content="#10151d">
+<title>Chess243 — Profil</title><link rel="stylesheet" href="css/style.css"><link rel="stylesheet" href="css/online.css"></head>
+<body>
+<header class="topbar"><a class="brand" href="./"><span class="brand-mark">♞</span><span>CHESS<span class="accent">243</span></span></a><a class="btn btn-small" href="./">← Accueil</a></header>
+<main class="online"><p id="msg"></p><div id="box" hidden>
+<div class="panel"><div class="prof-head"><span id="dot" class="dot"></span><h2 id="pname"></h2></div><small id="pstate"></small>
+<div class="stats" id="stats"></div><p id="total"></p>
+<div id="own" hidden><label for="nick">Pseudo (2 à 20 caractères)</label><input type="text" id="nick" maxlength="20"><button id="save-nick" class="btn btn-primary full" type="button">Enregistrer le pseudo</button></div>
+<div id="other" hidden><label for="tc">Défier ce joueur</label><select id="tc"><option value="1|0">1+0</option><option value="3|0">3+0</option><option value="3|2">3+2</option><option value="5|0" selected>5+0</option><option value="10|0">10+0</option><option value="15|0">15+0</option></select><button id="challenge" class="btn btn-primary full" type="button">Envoyer le défi</button></div></div>
+<div class="panel"><h3>Parties récentes</h3><ul id="games" class="rows"><li><small>Aucune partie.</small></li></ul></div></div></main>
+<script type="module">
+import { auth, db, fs, onAuthStateChanged } from "./js/firebase.js";
+const $ = id => document.getElementById(id), qs = new URLSearchParams(location.search);
+const cat = m => m < 3 ? "bullet" : m < 10 ? "blitz" : "rapid";
+let me = null, target = null, data = null;
+if (!auth) $("msg").textContent = "Firebase non configuré.";
+else onAuthStateChanged(auth, u => { me = u; target = qs.get("u") || (u && u.uid); if (!u) { $("msg").textContent = "Connecte-toi avec Google sur l'accueil pour voir les profils."; $("box").hidden = true; return; } load(); });
+async function load() {
+  const s = await fs.getDoc(fs.doc(db, "chess_users", target));
+  if (!s.exists()) { $("msg").textContent = "Joueur introuvable."; return; }
+  data = s.data(); $("msg").hidden = true; $("box").hidden = false;
+  const own = me.uid === target, on = own || Date.now() - (data.lastSeen || 0) < 75000;
+  $("pname").textContent = data.nick || data.name; $("dot").classList.toggle("on", on); $("pstate").textContent = on ? "En ligne" : "Hors ligne";
+  $("stats").innerHTML = [["bullet", "Bullet"], ["blitz", "Blitz"], ["rapid", "Rapide"]].map(([c, n]) => `<div><small>${n}</small><strong>${data["rating_" + c]}</strong><small>${data["games_" + c] || 0} parties</small></div>`).join("");
+  $("total").textContent = "Parties classées jouées : " + ["bullet", "blitz", "rapid"].reduce((a, c) => a + (data["games_" + c] || 0), 0);
+  $("own").hidden = !own; $("other").hidden = own; $("nick").value = data.nick || data.name || "";
+  const snap = await fs.getDocs(fs.query(fs.collection(db, "chess_games"), fs.where("uids", "array-contains", target), fs.limit(60)));
+  const rows = snap.docs.filter(d => d.data().status === "finished").sort((a, b) => (b.data().createdAt?.toMillis() || 0) - (a.data().createdAt?.toMillis() || 0)).slice(0, 15);
+  if (rows.length) $("games").innerHTML = "";
+  rows.forEach(d => { const x = d.data(), w = x.w.uid === target, opp = w ? x.b : x.w, r = x.result === "1/2-1/2" ? "d" : (x.result === "1-0") === w ? "w" : "l";
+    const li = document.createElement("li"), a = document.createElement("a"); a.href = "./?g=" + d.id; a.style.color = "inherit";
+    a.innerHTML = '<strong class="res-' + r + '">' + { w: "Victoire", l: "Défaite", d: "Nulle" }[r] + '</strong> <small></small>'; a.querySelector("small").textContent = `contre ${opp.name} · ${x.tcMin}+${x.tcInc} · ${x.reason || ""}`;
+    li.appendChild(a); $("games").appendChild(li); });
+}
+$("save-nick").onclick = async () => { const n = $("nick").value.trim(); if (n.length < 2) { alert("Pseudo trop court."); return; }
+  await fs.updateDoc(fs.doc(db, "chess_users", me.uid), { nick: n }); load(); alert("Pseudo enregistré."); };
+$("challenge").onclick = async () => {
+  const [m, i] = $("tc").value.split("|").map(Number), c = cat(m), mine = (await fs.getDoc(fs.doc(db, "chess_users", me.uid))).data();
+  const ref = await fs.addDoc(fs.collection(db, "chess_games"), { status: "waiting", vis: "private", invited: target, creator: { uid: me.uid, name: mine.nick || mine.name, rating: mine["rating_" + c] }, uids: [me.uid],
+    tcMin: m, tcInc: i, cat: c, moves: [], fen: "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1", turn: "w", wMs: m * 60000, bMs: m * 60000, createdAt: fs.serverTimestamp() });
+  location.href = "./?g=" + ref.id;
+};
+</script></body></html>
