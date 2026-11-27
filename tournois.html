@@ -1,0 +1,86 @@
+<!doctype html>
+<html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="theme-color" content="#10151d">
+<title>Chess243 — Tournois & groupes</title><link rel="stylesheet" href="css/style.css"><link rel="stylesheet" href="css/online.css"></head>
+<body>
+<header class="topbar"><a class="brand" href="./"><span class="brand-mark">♞</span><span>CHESS<span class="accent">243</span></span></a><a class="btn btn-small" href="./">← Accueil</a></header>
+<main class="online"><p id="msg">Connecte-toi avec Google ou e-mail sur l'accueil.</p>
+<div id="app" hidden>
+<div class="tabs"><button class="btn btn-small on" data-t="t">Tournois</button><button class="btn btn-small" data-t="g">Groupes</button></div>
+<div id="tab-t">
+  <div class="panel"><h3>Créer un tournoi</h3>
+    <input type="text" id="t-name" placeholder="Nom du tournoi" maxlength="40">
+    <select id="t-tc"><option value="1|0">1+0</option><option value="2|1">2+1</option><option value="3|0">3+0</option><option value="3|2">3+2</option><option value="5|0" selected>5+0</option><option value="5|3">5+3</option><option value="10|0">10+0</option><option value="15|0">15+0</option></select>
+    <input type="datetime-local" id="t-start"><select id="t-dur"><option value="30">Durée 30 min</option><option value="60" selected>Durée 1 h</option><option value="120">Durée 2 h</option><option value="1440">Durée 24 h</option></select>
+    <select id="t-vis"><option value="public">Public</option><option value="private">Privé (code)</option></select>
+    <button id="t-create" class="btn btn-primary full" type="button">Créer</button></div>
+  <div class="panel"><input type="text" id="t-code" placeholder="Code d'un tournoi privé" maxlength="6"><button id="t-join-code" class="btn btn-small" type="button">Rejoindre avec le code</button></div>
+  <div id="t-list"></div>
+  <div class="panel" id="t-detail" hidden></div>
+</div>
+<div id="tab-g" hidden>
+  <div class="panel"><h3>Créer un groupe</h3><input type="text" id="g-name" placeholder="Nom du groupe" maxlength="40"><select id="g-vis"><option value="public">Public</option><option value="private">Privé (code)</option></select><button id="g-create" class="btn btn-primary full" type="button">Créer</button></div>
+  <div class="panel"><input type="text" id="g-code" placeholder="Code d'un groupe privé" maxlength="6"><button id="g-join-code" class="btn btn-small" type="button">Rejoindre avec le code</button></div>
+  <div id="g-list"></div>
+  <div class="panel" id="g-detail" hidden></div>
+</div></div></main>
+<script type="module">
+import { auth, db, fs, onAuthStateChanged } from "./js/firebase.js";
+const $ = id => document.getElementById(id), col = n => fs.collection(db, n);
+const code = () => Math.random().toString(36).slice(2, 8).toUpperCase();
+let me = null, myName = "Joueur";
+const fmt = ms => new Date(ms).toLocaleString("fr-FR", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" });
+document.querySelectorAll(".tabs .btn").forEach(b => b.onclick = () => { document.querySelectorAll(".tabs .btn").forEach(x => x.classList.toggle("on", x === b)); $("tab-t").hidden = b.dataset.t !== "t"; $("tab-g").hidden = b.dataset.t !== "g"; });
+if (!auth) $("msg").textContent = "Firebase non configuré.";
+else onAuthStateChanged(auth, async u => { me = u; if (!u) { $("app").hidden = true; $("msg").hidden = false; return; }
+  const s = await fs.getDoc(fs.doc(db, "chess_users", u.uid)); myName = s.exists() ? (s.data().nick || s.data().name) : (u.displayName || "Joueur");
+  $("msg").hidden = true; $("app").hidden = false; const d = new Date(Date.now() + 600000 - new Date().getTimezoneOffset() * 60000); $("t-start").value = d.toISOString().slice(0, 16); loadT(); loadG(); });
+function item(title, sub, onclick) { const d = document.createElement("div"); d.className = "panel"; d.style.cursor = "pointer"; d.innerHTML = "<strong></strong><br><small></small>"; d.querySelector("strong").textContent = title; d.querySelector("small").textContent = sub; d.onclick = onclick; return d; }
+// ---------- Tournois
+async function loadT() {
+  const snap = await fs.getDocs(fs.query(col("chess_tournaments"), fs.limit(100))), now = Date.now(), list = $("t-list"); list.innerHTML = "";
+  const all = snap.docs.map(d => ({ id: d.id, ...d.data() })).filter(t => t.vis === "public" || t.owner === me.uid).sort((a, b) => b.startAt - a.startAt);
+  [["En cours", t => t.startAt <= now && t.endAt > now], ["À venir", t => t.startAt > now], ["Terminés", t => t.endAt <= now]].forEach(([title, f]) => {
+    const r = all.filter(f); if (!r.length) return; const h = document.createElement("div"); h.className = "sec-title"; h.textContent = title; list.appendChild(h);
+    r.forEach(t => list.appendChild(item(t.name + (t.vis === "private" ? " 🔒" : ""), `${t.tcMin}+${t.tcInc} · ${fmt(t.startAt)} → ${fmt(t.endAt)}`, () => showT(t.id)))); });
+  if (!all.length) list.innerHTML = '<p><small>Aucun tournoi pour le moment.</small></p>';
+}
+$("t-create").onclick = async () => {
+  const name = $("t-name").value.trim(), start = new Date($("t-start").value).getTime(); if (name.length < 3 || !start) { alert("Nom (3 caractères min.) et date de début requis."); return; }
+  const [m, i] = $("t-tc").value.split("|").map(Number), vis = $("t-vis").value;
+  const ref = await fs.addDoc(col("chess_tournaments"), { name, tcMin: m, tcInc: i, startAt: start, endAt: start + Number($("t-dur").value) * 60000, vis, code: vis === "private" ? code() : null, owner: me.uid, ownerName: myName });
+  await fs.setDoc(fs.doc(db, "chess_tournaments", ref.id, "players", me.uid), { name: myName, points: 0, games: 0 }); $("t-name").value = ""; await loadT(); showT(ref.id);
+};
+$("t-join-code").onclick = async () => { const c = $("t-code").value.trim().toUpperCase(), s = await fs.getDocs(fs.query(col("chess_tournaments"), fs.where("code", "==", c), fs.limit(1))); if (s.empty) alert("Code inconnu."); else showT(s.docs[0].id); };
+async function showT(id) {
+  const t = (await fs.getDoc(fs.doc(db, "chess_tournaments", id))).data(), pr = fs.doc(db, "chess_tournaments", id, "players", me.uid), joined = (await fs.getDoc(pr)).exists(), now = Date.now();
+  const ps = (await fs.getDocs(fs.collection(db, "chess_tournaments", id, "players"))).docs.map(d => ({ id: d.id, ...d.data() })).sort((a, b) => b.points - a.points);
+  const box = $("t-detail"); box.hidden = false; box.innerHTML = "<h3></h3><small></small><p></p><ol class='rows'></ol>";
+  box.querySelector("h3").textContent = t.name; box.querySelector("small").textContent = `${t.tcMin}+${t.tcInc} · ${fmt(t.startAt)} → ${fmt(t.endAt)}` + (t.code && t.owner === me.uid ? ` · Code : ${t.code}` : "");
+  box.querySelector("p").textContent = "Victoire 2 pts, nulle 1 pt. Les parties du tournoi comptent pour l'Elo.";
+  const ol = box.querySelector("ol"); ps.forEach((p, k) => { const li = document.createElement("li"); li.innerHTML = `<span>${k + 1}. <a href="profile.html?u=${p.id}" style="color:inherit"></a></span><span>${p.points} pts <small>(${p.games})</small></span>`; li.querySelector("a").textContent = p.name; ol.appendChild(li); });
+  if (!ps.length) ol.innerHTML = "<li><small>Aucun participant.</small></li>";
+  const live = t.startAt <= now && t.endAt > now, b = document.createElement("button"); b.className = "btn btn-primary full";
+  if (!joined && t.endAt > now) { b.textContent = "Rejoindre le tournoi"; b.onclick = async () => { await fs.setDoc(pr, { name: myName, points: 0, games: 0 }); showT(id); }; box.appendChild(b); }
+  else if (joined && live) { b.textContent = "Jouer une partie du tournoi"; b.onclick = () => { location.href = `./?t=${id}&tc=${t.tcMin}|${t.tcInc}`; }; box.appendChild(b); }
+  else if (joined && t.startAt > now) { const s = document.createElement("small"); s.textContent = "Tu es inscrit. Reviens à l'heure de début."; box.appendChild(s); }
+  box.scrollIntoView({ behavior: "smooth" });
+}
+// ---------- Groupes
+async function loadG() {
+  const [a, b] = await Promise.all([fs.getDocs(fs.query(col("chess_groups"), fs.where("vis", "==", "public"), fs.limit(50))), fs.getDocs(fs.query(col("chess_groups"), fs.where("members", "array-contains", me.uid), fs.limit(50)))]);
+  const m = new Map(); [...a.docs, ...b.docs].forEach(d => m.set(d.id, { id: d.id, ...d.data() })); const list = $("g-list"); list.innerHTML = "";
+  m.forEach(g => list.appendChild(item(g.name + (g.vis === "private" ? " 🔒" : ""), `${g.members.length} membre(s)` + (g.members.includes(me.uid) ? " · tu en fais partie" : ""), () => showG(g.id))));
+  if (!m.size) list.innerHTML = '<p><small>Aucun groupe pour le moment.</small></p>';
+}
+$("g-create").onclick = async () => { const name = $("g-name").value.trim(); if (name.length < 3) { alert("Nom trop court."); return; } const vis = $("g-vis").value;
+  const ref = await fs.addDoc(col("chess_groups"), { name, vis, code: vis === "private" ? code() : null, owner: me.uid, members: [me.uid], names: { [me.uid]: myName } }); $("g-name").value = ""; await loadG(); showG(ref.id); };
+$("g-join-code").onclick = async () => { const c = $("g-code").value.trim().toUpperCase(), s = await fs.getDocs(fs.query(col("chess_groups"), fs.where("code", "==", c), fs.limit(1))); if (s.empty) alert("Code inconnu."); else { await joinG(s.docs[0].id); } };
+async function joinG(id) { await fs.updateDoc(fs.doc(db, "chess_groups", id), { members: fs.arrayUnion(me.uid), ["names." + me.uid]: myName }); await loadG(); showG(id); }
+async function showG(id) {
+  const g = (await fs.getDoc(fs.doc(db, "chess_groups", id))).data(), box = $("g-detail"), inG = g.members.includes(me.uid); box.hidden = false; box.innerHTML = "<h3></h3><small></small><ul class='rows'></ul>";
+  box.querySelector("h3").textContent = g.name; box.querySelector("small").textContent = (g.code && inG ? `Code d'invitation : ${g.code} · ` : "") + g.members.length + " membre(s)";
+  const ul = box.querySelector("ul"); g.members.forEach(u => { const li = document.createElement("li"), a = document.createElement("a"); a.href = "profile.html?u=" + u; a.style.color = "inherit"; a.textContent = g.names[u] || "Joueur"; li.appendChild(a); ul.appendChild(li); });
+  if (!inG && g.vis === "public") { const b = document.createElement("button"); b.className = "btn btn-primary full"; b.textContent = "Rejoindre le groupe"; b.onclick = () => joinG(id); box.appendChild(b); }
+  box.scrollIntoView({ behavior: "smooth" });
+}
+</script></body></html>
